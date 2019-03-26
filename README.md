@@ -12,7 +12,6 @@ Additionally, the example tutorial requires FOAM-FSI https://github.com/davidsbl
 
 ## MBDyn installation ##
 ```
-https://www.mbdyn.org/?Software_Download
 wget https://www.mbdyn.org/userfiles/downloads/mbdyn-1.7.3.tar.gz
 tar -xf mbdyn-1.7.3.tar.gz
 cd mbdyn-1.7.3
