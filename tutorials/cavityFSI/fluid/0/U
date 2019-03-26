@@ -1,0 +1,57 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (1e-10 0 0);
+
+boundaryField
+{
+    inlet
+    {
+        type groovyBC;
+        valueExpression "vector((pos().y-0.875)/0.125*(1.0-cos(2.0*pi*time()/5.0)),0.0,0.0)";
+        value           uniform (0 0 0);
+    }
+    movingWall
+    {
+        type groovyBC;
+        valueExpression "vector(1.0-cos(2.0*pi*time()/5.0),0.0,0.0)";
+        value           uniform (0 0 0);
+    }
+
+    bottomWall
+    {
+        type            myMovingWallVelocity;
+        value           uniform (0 0 0);
+    }
+    fixedWalls
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    outlet
+    {
+        type            zeroGradient;
+    }
+
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

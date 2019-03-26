@@ -1,0 +1,5 @@
+cd fluid
+blockMesh  &> log.blockMesh
+fsiFluidFoam &> log.fsiFluidFoam & 
+cd ../structure
+python cavityFSI.py &> log.structureSolver &

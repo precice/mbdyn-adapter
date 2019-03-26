@@ -1,0 +1,6 @@
+cd fluid
+. $WM_PROJECT_DIR/bin/tools/CleanFunctions
+cleanCase
+rm -f EventTimings-Fluid_Solver.log Events-Fluid_Solver.log iterations-Fluid_Solver.txt log.fsiFluidFoam
+cd ../structure
+rm -f EventTimings-Structure_Solver.log Events-Structure_Solver.log iterations-Structure_Solver.txt convergence-Structure_Solver.txt log.structure log.gmsh log.mbdyn log.structureSolver *.vtk membrane.log membrane.mbd membrane.pla membrane.sock membrane.out
