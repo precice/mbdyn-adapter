@@ -9,8 +9,7 @@ Requirements:
 *    MBDyn with Python interface
 *    preCICE with Python interface
 
-Additionally, the example tutorial requires FOAM-FSI https://github.com/davidsblom/FOAM-FSI
-
+Additionally, the example tutorial requires [FOAM-FSI](https://github.com/davidsblom/FOAM-FSI) 
 ## MBDyn installation ##
 ```
 wget https://www.mbdyn.org/userfiles/downloads/mbdyn-1.7.3.tar.gz
