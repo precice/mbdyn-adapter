@@ -22,6 +22,7 @@ make install
 ```
 
 Add the Python interface path to $PYTHONPATH
+
 export PYTHONPATH=$PYTHONPATH:/usr/local/mbdyn/libexec/mbpy
 
 Requirements:
