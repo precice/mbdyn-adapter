@@ -11,7 +11,7 @@ Requirements:
 Additionally, the example tutorial requires FOAM-FSI https://github.com/davidsblom/FOAM-FSI
 
 ## MBDyn installation ##
-'''
+```
 https://www.mbdyn.org/?Software_Download
 wget https://www.mbdyn.org/userfiles/downloads/mbdyn-1.7.3.tar.gz
 tar -xf mbdyn-1.7.3.tar.gz
@@ -19,7 +19,7 @@ cd mbdyn-1.7.3
 CPPFLAGS=-I/usr/include/suitesparse ./configure
 make 
 make install
-'''
+```
 
 Add the Python interface path to $PYTHONPATH
 export PYTHONPATH=$PYTHONPATH:/usr/local/mbdyn/libexec/mbpy
