@@ -1,8 +1,9 @@
 # preCICE adapter for MBDyn #
 
 ## Installation ##
-
+```
 sudo python setup.py install
+```
 
 Requirements:
 *    MBDyn with Python interface
