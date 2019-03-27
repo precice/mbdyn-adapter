@@ -5,7 +5,7 @@
 sudo python setup.py install
 ```
 
-Requirements:
+Dependencies:
 *    MBDyn with Python interface
 *    preCICE with Python interface
 
@@ -25,5 +25,5 @@ Add the Python interface path to $PYTHONPATH
 export PYTHONPATH=$PYTHONPATH:/usr/local/mbdyn/libexec/mbpy
 ```
 
-Requirements:
+Dependencies:
 *    UMFPACK (Part of libsuitesparse-dev in Ubuntu repository.)
