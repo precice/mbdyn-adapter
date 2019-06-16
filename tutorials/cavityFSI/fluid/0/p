@@ -43,10 +43,10 @@ boundaryField
         value           uniform 0;
     }
 
-    frontAndBack
-    {
-        type            empty;
-    }
+    /*frontAndBack*/
+    /*{*/
+        /*type            symmetry;*/
+    /*}*/
 }
 
 // ************************************************************************* //

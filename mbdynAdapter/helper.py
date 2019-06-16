@@ -28,13 +28,13 @@ class MBDynHelper:
         accels = 0
         self.structurelogfile = open("log.mbdyn",'w')
         self.process = Popen(['mbdyn','-f', self.mbdscript], stdout=self.structurelogfile, stderr=self.structurelogfile)
-        # self.process.stdin = ''
+        self.process.stdin = ''
         # self.process = Popen(['mbdyn','-f', self.mbdscript, '-o', self.caseName])
         self.nodal = mbcNodal(path, host, port, timeout, verbose, data_and_next, refnode, len(self.mesh.nodes), labels, rot, accels);
         self.nodal.negotiate()
         self.nodal.recv()
         self.initialized = True
-        print 'MBDyn initialized\ncontrolDict {} \nmaterialDict {}'.format(self.controlDict, self.materialDict)
+        print('MBDyn initialized\ncontrolDict {} \nmaterialDict {}'.format(self.controlDict, self.materialDict))
 
     def readMsh(self, fileName):
         self.caseName = os.path.splitext(os.path.basename(fileName))[0]
@@ -75,7 +75,7 @@ class MBDynHelper:
                         elif cells[1] == 3:
                             membranes.append(cells)
                         else:
-                            print 'Skipped element, type {}'.format(cells[1])
+                            print('Skipped element, type {}'.format(cells[1]))
                     edges = np.array(edges)
                     membranes = np.array(membranes)
 
@@ -132,7 +132,11 @@ class MBDynHelper:
     def getDisplacements(self):
         return np.reshape(self.nodal.n_x, (-1,3)) - self.mesh.nodes
 
-    def setLoads(self, pressure = 0, stresses = 0):
+    def setForces(self, force):
+        self.force = force
+        self.nodal.n_f[:] = np.ravel(force)
+
+    def setDistributedLoads(self, pressure = 0, stresses = 0):
         self.pressure = pressure
         self.stresses = stresses
         self.loadsChanged = True
@@ -159,7 +163,7 @@ class MBDynHelper:
         return forces
 
     def solve(self, converged = True):
-        self.calcLoads()
+        # self.calcLoads()
         stop = self.nodal.send(converged)
         if stop:
             self.writeVTK('final')
@@ -179,13 +183,13 @@ class MBDynHelper:
             currentX = self.getDisplacements()
             twoNormX = np.linalg.norm(currentX - previousX)
             previousX = currentX
-            print 'Finished iteration: {}/{}, displacement two-norm diff: {}/{}'.format(i,maxIterations, twoNormX, tolerance)
+            print('Finished iteration: {}/{}, displacement two-norm diff: {}/{}'.format(i,maxIterations, twoNormX, tolerance))
             if twoNormX < tolerance:
-                print 'Converged in {}/{} iterations'.format(i, maxIterations)
+                print('Converged in {}/{} iterations'.format(i, maxIterations))
                 if write:
                     self.writeVTK('final')
                 return
-        print 'No convergence in {} iterations'.format(maxIterations)
+        print('No convergence in {} iterations'.format(maxIterations))
         return True
 
     def finalize(self):
@@ -218,7 +222,7 @@ class MBDynHelper:
             fileName = '{}_{:0>5}.vtk'.format(self.caseName,extension)
         else:
             fileName = '{}.vtk'.format(self.caseName)
-        print "Writing output: {}".format(fileName)
+        print("Writing output: {}".format(fileName))
         with open(fileName,'w') as fout:
             fout.write('''# vtk DataFile Version 2.0
 {}

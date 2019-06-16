@@ -15,7 +15,7 @@ Additionally, the example tutorial requires [FOAM-FSI](https://github.com/davids
 wget https://www.mbdyn.org/userfiles/downloads/mbdyn-1.7.3.tar.gz
 tar -xf mbdyn-1.7.3.tar.gz
 cd mbdyn-1.7.3
-CPPFLAGS=-I/usr/include/suitesparse ./configure
+CPPFLAGS=-I/usr/include/suitesparse ./configure --enable-python=yes
 make 
 make install
 ```

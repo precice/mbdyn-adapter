@@ -12,8 +12,11 @@ Plane Surface(6) = {6};
 
 Transfinite Surface {6};
 Transfinite Line {1,3} = 24 Using Progression 1;
-Transfinite Line {2,4} = 2 Using Progression 1;
+Transfinite Line {2,4} = 24 Using Progression 1;
 
 Recombine Surface{6};
-Physical Line("fixAll") = {2,4};
+/*Physical Line("fixAll") = {1,3};*/
+Physical Line("fixAll") = {1,2,3,4};
 Physical Surface("Membrane") = {6};
+Mesh.MshFileVersion = 2;
+

@@ -22,20 +22,40 @@ boundaryField
 {
     inlet
     {
-        type groovyBC;
-        valueExpression "vector((pos().y-0.875)/0.125*(1.0-cos(2.0*pi*time()/5.0)),0.0,0.0)";
+        name            oscillatingLinearInlet;
+        type            codedFixedValue;
         value           uniform (0 0 0);
+        code            #{
+            const vector axis(0, 1, 0);
+            vectorField v(this->patch().Cf().size());
+            scalar t(this->db().time().value());
+            forAll(this->patch().Cf(),patchid){
+                vector vi((this->patch().Cf()[patchid].y()-0.875)/0.125*(1.0-cos(2.0*3.14159*t/5.0)),0,0);
+                v[patchid] = vi;
+            }
+            operator==(v);
+        #};
     }
     movingWall
     {
-        type groovyBC;
-        valueExpression "vector(1.0-cos(2.0*pi*time()/5.0),0.0,0.0)";
+        name            oscillatingFixedInlet;
+        type            codedFixedValue;
         value           uniform (0 0 0);
+        code            #{
+            const vector axis(0, 1, 0);
+            vectorField v(this->patch().Cf().size());
+            scalar t(this->db().time().value());
+            vector vi(1.0-cos(2.0*3.14159*t/5.0),0,0);
+            forAll(this->patch().Cf(),patchid){
+                v[patchid] = vi;
+            }
+            operator==(v);
+        #};
     }
 
     bottomWall
     {
-        type            myMovingWallVelocity;
+        type            movingWallVelocity;
         value           uniform (0 0 0);
     }
     fixedWalls
@@ -48,10 +68,10 @@ boundaryField
         type            zeroGradient;
     }
 
-    frontAndBack
-    {
-        type            empty;
-    }
+    /*frontAndBack*/
+    /*{*/
+        /*type            symmetry;*/
+    /*}*/
 }
 
 // ************************************************************************* //

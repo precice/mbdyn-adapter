@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+
+<precice-configuration>
+
+    <solver-interface dimensions="3">
+
+        <data:vector name="Force" />
+        <data:vector name="DisplacementDelta" />
+
+        <mesh name="Fluid_Nodes">
+            <use-data name="DisplacementDelta" />
+        </mesh>
+
+        <mesh name="Fluid_CellCenters">
+            <use-data name="Force" />
+        </mesh>
+
+        <mesh name="Structure_Nodes">
+            <use-data name="DisplacementDelta" />
+            <use-data name="Force" />
+        </mesh>
+
+
+        <participant name="Fluid_Solver">
+            <use-mesh name="Fluid_Nodes" provide="yes" />
+            <use-mesh name="Fluid_CellCenters" provide="yes" />
+            <use-mesh name="Structure_Nodes" from="Structure_Solver" />
+            <write-data mesh="Fluid_CellCenters" name="Force" />
+            <read-data mesh="Fluid_Nodes" name="DisplacementDelta" />
+            <!--<mapping:nearest-projection direction="read" from="Structure_Nodes" to="Fluid_Nodes"-->
+                <!--constraint="consistent" timing="initial"/>-->
+            <!--<mapping:nearest-projection direction="write" from="Fluid_CellCenters" to="Structure_Nodes" -->
+                <!--constraint="consistent" timing="initial"/>-->
+            <!--<mapping:nearest-projection direction="write" from="Fluid_CellCenters" to="Structure_Nodes" constraint="conservative" timing="initial" />-->
+            <!--<mapping:nearest-projection direction="read" from="Structure_Nodes" to="Fluid_Nodes" constraint="consistent" timing="initial"  />-->
+           <mapping:rbf-thin-plate-splines direction="write" from="Fluid_CellCenters" to="Structure_Nodes" constraint="conservative" y-dead="true" />
+           <mapping:rbf-thin-plate-splines direction="read" from="Structure_Nodes" to="Fluid_Nodes" constraint="consistent" y-dead="true" />
+        </participant>
+
+        <participant name="Structure_Solver">
+            <use-mesh name="Structure_Nodes" provide="yes"/>
+            <write-data mesh="Structure_Nodes" name="DisplacementDelta" />
+            <read-data mesh="Structure_Nodes" name="Force" />
+        </participant>
+
+        <m2n:sockets exchange-directory="../" from="Fluid_Solver" to="Structure_Solver" distribution-type="gather-scatter" />
+
+        <coupling-scheme:serial-implicit>
+            <participants first="Fluid_Solver" second="Structure_Solver" />
+            <max-timesteps value="70000" />
+            <timestep-length value="0.01" />
+            <exchange data="Force" from="Fluid_Solver" mesh="Structure_Nodes" to="Structure_Solver" />
+            <exchange data="DisplacementDelta" from="Structure_Solver" mesh="Structure_Nodes" to="Fluid_Solver" />
+            <relative-convergence-measure limit="1.0e-4" data="DisplacementDelta" mesh="Structure_Nodes" />
+            <relative-convergence-measure limit="1.0e-4" data="Force" mesh="Structure_Nodes" />
+            <extrapolation-order value="2" />
+
+           <post-processing:IQN-IMVJ>
+                <data name="DisplacementDelta" mesh="Structure_Nodes"/>
+                <preconditioner type="residual-sum"/>
+                <initial-relaxation value="0.1"/>
+                <max-used-iterations value="10"/>
+                <timesteps-reused value="1"/>
+           </post-processing:IQN-IMVJ>		
+
+        </coupling-scheme:serial-implicit>
+    </solver-interface>
+</precice-configuration>

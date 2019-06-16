@@ -1,15 +1,9 @@
-/*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.2                                |
-|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
-|    \\/     M anipulation  |                                                 |
-\*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
     format      ascii;
     class       dictionary;
+    location    "system";
     object      fvSolution;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -17,36 +11,68 @@ FoamFile
 solvers
 {
 
-  p
-  {
-    solver           PCG;
-    preconditioner   DIC;
-    tolerance        1e-14;
-    relTol           1.0e-3;
-  }
+    p
+    {
+        solver           PCG;
+        preconditioner   DIC;
+        tolerance        1e-8;
+        relTol 	         1.0e-3;
+    }
 
-  U
-  {
-    solver BiCGStab;
-    preconditioner DILU;
-    tolerance 1e-14;
-  }
+    pFinal
+    {
+        $p;
+        relTol          0;
+    }
+
+    pcorr
+    {
+        $p;
+    }
+
+    pcorrFinal
+    {
+        $pcorr;
+        relTol          0;
+    }
+
+    Phi
+    {
+        $p;
+    }
+
+    "(U|cellDisplacement)"
+    {
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-6;
+        relTol          1e-4;
+        minIter         2;
+    }
+
+    "(U|cellDisplacement)Final"
+    {
+        $U;
+        relTol          0;
+    }
 }
-
 
 PIMPLE
 {
-    tolerance 1.0e-12;
-    relTol 1.0e-6;
-    maxIter 10;
-    minIter 1;
-    nCorrectors 10;
-    nNonOrthogonalCorrectors 0;
-    pisoTol 1.0e-3;
+    nCorrectors 4;
+    nNonOrthogonalCorrectors 1;
+    consistent  true;
+    correctPhi  true;
+    momentumPredictor true; 
+    nOuterCorrectors	1;
 }
 
-relaxationFactors
+
+potentialFlow
 {
-    /*U 0.8;*/
-    /*p 0.8;*/
+    nNonOrthogonalCorrectors 10;
 }
+
+
+
+// ************************************************************************* //

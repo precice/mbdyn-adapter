@@ -1,38 +1,22 @@
-/*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.2                                |
-|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
-|    \\/     M anipulation  |                                                 |
-\*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
     format      ascii;
     class       dictionary;
+    location    "constant";
     object      dynamicMeshDict;
 }
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 dynamicFvMesh dynamicMotionSolverFvMesh;
 
-solver ElRBFMeshMotionSolver;
+motionSolverLibs ("libfvMotionSolvers.so");
 
-movingPatches ( bottomWall );
+solver      displacementLaplacian;
 
-staticPatches ( inlet outlet movingWall fixedWalls );
+displacementLaplacianCoeffs {
 
-coarseningStrategy AdaptiveCoarsening;
+    diffusivity quadratic inverseDistance (bottomWall);
 
-interpolation
-{
-  function TPS;
-}
-
-AdaptiveCoarsening
-{
-    tol 1e-3;
-    reselectionTol 1e-2;
-    minPoints 100;
-    maxPoints 500;
 }
