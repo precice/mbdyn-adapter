@@ -27,5 +27,3 @@ export PYTHONPATH=$PYTHONPATH:/usr/local/mbdyn/libexec/mbpy
 
 Dependencies:
 *    UMFPACK (Part of libsuitesparse-dev in Ubuntu repository.)
-## Results ##
-[[tutorials/cavityFSI/fsicavity.svg]]
