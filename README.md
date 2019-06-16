@@ -20,6 +20,11 @@ make
 make install
 ```
 
+Add mbdyn executable path to $PATH
+```
+export PATH=$PATH:/usr/local/mbdyn/bin
+```
+
 Add the Python interface path to $PYTHONPATH
 ```
 export PYTHONPATH=$PYTHONPATH:/usr/local/mbdyn/libexec/mbpy
