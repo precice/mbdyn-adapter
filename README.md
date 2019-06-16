@@ -8,8 +8,8 @@ sudo python setup.py install
 Dependencies:
 *    MBDyn with Python interface
 *    preCICE with Python interface
+*    OpenFOAM-adapter for preCICE
 
-Additionally, the example tutorial requires [FOAM-FSI](https://github.com/davidsblom/FOAM-FSI) 
 ## MBDyn installation ##
 ```
 wget https://www.mbdyn.org/userfiles/downloads/mbdyn-1.7.3.tar.gz
