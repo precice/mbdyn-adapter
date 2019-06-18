@@ -12,7 +12,7 @@ interfaces:
   locations: faceNodes
   patches:
   - bottomWall
-  read-data: deltaDisplacements
+  read-data: DisplacementDelta
 
 FSIenabled: true
 
