@@ -32,3 +32,6 @@ export PYTHONPATH=$PYTHONPATH:/usr/local/mbdyn/libexec/mbpy
 
 Dependencies:
 *    UMFPACK (Part of libsuitesparse-dev in Ubuntu repository.)
+
+## Acknowledgements
+This project has received funding from the European Union’s Horizon 2020 research and innovation programme under the grant agreement No. 691173 (REACH) and the Marie Sklodowska-Curie grant agreement No 642682 (AWESCO).
