@@ -273,6 +273,7 @@ VECTORS forces float
             mass = '' 
         if 'C' in self.materialDict and self.materialDict['C']:
             damping = self.MBDamping()
+            nnodes += 1
             njoints += (nnodes + 1)
         else:
             damping = ''
@@ -297,7 +298,7 @@ begin: initial value;
 end: initial value;
 
 begin: control data;
-    structural nodes: {nnodes} + 1;
+    structural nodes: {nnodes};
     beams: 0;
     plates: {nmembranes};
     joints: {njoints};
@@ -338,7 +339,8 @@ end: elements;
     def MBNodes(self):
         nodesstr = "structural: {}, dynamic, {}, {}, {}, eye, null, null;"
         string = '\n'.join([nodesstr.format(i,n[0],n[1],n[2]) for i, n in enumerate(self.mesh.nodes)])
-        string += '\nstructural: {}, static, 0.0, 0.0, -1.0, eye, null, null, output, no;'.format(len(self.mesh.nodes))
+        if 'C' in self.materialDict and self.materialDict['C']:
+            string += '\nstructural: {}, static, 0.0, 0.0, -1.0, eye, null, null, output, no;'.format(len(self.mesh.nodes))
 
         return string
 
@@ -372,6 +374,15 @@ end: elements;
                 if 'Y' in name[2]:
                     dofs[idofs, 1] = True
                 if 'Z' in name[2]:
+                    dofs[idofs, 2] = True
+                if 'XY' in name[2]:
+                    dofs[idofs, 0] = True
+                    dofs[idofs, 1] = True
+                if 'XZ' in name[2]:
+                    dofs[idofs, 0] = True
+                    dofs[idofs, 2] = True
+                if 'YZ' in name[2]:
+                    dofs[idofs, 1] = True
                     dofs[idofs, 2] = True
         for i,d in enumerate(dofs):
             dof = ['inactive','inactive','inactive']
