@@ -1,5 +1,7 @@
 # preCICE adapter for MBDyn #
 
+:heart: **This adapter needs a maintainer. [Read more here](https://github.com/precice/mbdyn-adapter/issues/3).** :heart:
+
 ## Installation ##
 ```
 sudo python setup.py install
