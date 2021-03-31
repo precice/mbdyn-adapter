@@ -405,7 +405,7 @@ end: elements;
 
         areas = self.getAreas()
 
-        memforces = areas[:len(self.mesh.membranes)] + areas[len(self.mesh.membranes):]
+        areas = areas[:len(self.mesh.membranes)] + areas[len(self.mesh.membranes):]
 
         # Preferrably no looping
         for i,m in enumerate(self.mesh.membranes):
