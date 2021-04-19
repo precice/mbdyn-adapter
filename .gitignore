@@ -1,3 +1,9 @@
+# Ignore example folder
+**/test-files/
+
+# Sublime project
+*.sublime*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

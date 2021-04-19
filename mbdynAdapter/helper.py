@@ -1,436 +1,646 @@
-import itertools
-import numpy as np
-import os
-from subprocess import Popen, PIPE
-from mbc_py_interface import mbcNodal
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-class Mesh:
-    pass
+from subprocess import Popen
+import os
+from mbc_py_interface import mbcNodal
+from bs4 import BeautifulSoup
+import precice
+import numpy as np
+from scipy.spatial.transform import Rotation as R
+import logging
+
+# create logger
+module_logger = logging.getLogger('adapter.helper')
 
 class MBDynHelper:
-    def __init__(self):
+    def __init__(self, mesh):
         self.initialized = False
-        self.loadsChanged = False
+        self.process = None
+        self.nodal = None
+        self.log_file = None
+        self.log_file_path = '../mbdyn.log'
+        self.input_file_name = 'shell.mbd'
+        self.mesh = mesh
+        self.load_changed = False
+        self.pressure = 0
+        self.stresses = 0
+        self.node_forces = 0
+        #self.cell_forces = None
+        self._debug_samples = [0]
 
-    def initializeMBDyn(self):
-        self.writeMBDynScript()
-        self.membraneForces = []
-        self.nodalForces = []
-        path = '{}.sock'.format(self.caseName)
+    def _equidistant_samples(self, num_samples=6):
+        self._debug_samples.append(0)
+        num_nodes = self.mesh.number_of_nodes()
+        interval = num_nodes/(num_samples-1)
+        for i in range(1, num_samples):
+            self._debug_samples.append(int(interval*i)-1)
+
+
+    def initialize(self, case='shell'):
+
+
+        self.input_file_name = case + '.mbd'
+        self.log_file = open(self.log_file_path, 'w')
+        self.process = Popen(['mbdyn', '-f', self.input_file_name],
+                             stdout=self.log_file,
+                             stderr=self.log_file)
+        self.process.stdin = ''
+
+        path = '{name}.sock'.format(name=case)
+        module_logger.debug('socket path: %s' % path)
         host = ''
         port = 0
-        timeout = -1 # forever
-        verbose = 0
+        timeout = -1
+        verbose = 1
         data_and_next = 1
-        refnode = 0 # no reference node
-        labels = 0
-        rot = 0 # orientation vector
+        refnode = 0
+        nodes = self.mesh.number_of_nodes()
+        labels = 0 # 16
+        rot = 0 # for rotvec 256, rotmat 512, euler 1024; see mbc.h enum MBCType
         accels = 0
-        self.structurelogfile = open("log.mbdyn",'w')
-        self.process = Popen(['mbdyn','-f', self.mbdscript], stdout=self.structurelogfile, stderr=self.structurelogfile)
-        self.process.stdin = ''
-        # self.process = Popen(['mbdyn','-f', self.mbdscript, '-o', self.caseName])
-        self.nodal = mbcNodal(path, host, port, timeout, verbose, data_and_next, refnode, len(self.mesh.nodes), labels, rot, accels);
+        self.nodal = mbcNodal(path, host, port, timeout, verbose,
+                              data_and_next, refnode, nodes, labels,
+                              rot, accels)
         self.nodal.negotiate()
-        self.nodal.recv()
+        print(self.nodal.recv())
         self.initialized = True
-        print('MBDyn initialized\ncontrolDict {} \nmaterialDict {}'.format(self.controlDict, self.materialDict))
 
-    def readMsh(self, fileName):
-        self.caseName = os.path.splitext(os.path.basename(fileName))[0]
-        names = []
-        nodes = None
-        membranes = []
-        edges = []
-        with open(fileName) as fin:
-            readNames = False
-            readNodes = False
-            readElements = False
-            nlines = 0
-            for line in fin:
-                if '$PhysicalNames' in line:
-                    readNames = True
-                elif '$Nodes' in line:
-                    readNodes = True
-                elif '$Elements' in line:
-                    readElements = True
-                elif readNames:
-                    nlines = int(line)
-                    lines_gen = itertools.islice(fin,0,nlines)
-                    for l in lines_gen:
-                        cells = l.split()
-                        names.append((int(cells[0]), int(cells[1]), cells[2].replace('"','')))
-                    readNames = False
-                elif readNodes:
-                    nlines = int(line)
-                    nodes = np.genfromtxt(itertools.islice(fin,0,nlines),dtype=float)
-                    readNodes = False
-                elif readElements:
-                    nlines = int(line)
-                    lines_gen = itertools.islice(fin,0,nlines)
-                    for e in lines_gen:
-                        cells = map(int,e.split())
-                        if cells[1] == 1:
-                            edges.append(cells)
-                        elif cells[1] == 3:
-                            membranes.append(cells)
-                        else:
-                            print('Skipped element, type {}'.format(cells[1]))
-                    edges = np.array(edges)
-                    membranes = np.array(membranes)
+    def finalize(self):
+        try:
+            self.nodal.destroy()
+            self.log_file.close()
+        except AttributeError:
+            print('Warning: Could not close log file or destroy mbc.')
 
-                    self.mesh = Mesh()
-                    self.mesh.nodes = np.array(nodes)[:,1:]
-                    self.mesh.edges = edges[:,-2:] - 1
-                    self.mesh.edgeNames = edges[:,3]
-                    self.mesh.membranes = membranes[:,-4:] - 1
-                    self.mesh.membraneNames = membranes[:,3]
-                    self.mesh.names = names
-                    readElements = False
-        self.indexing = 10**(int(np.log10(len(self.mesh.nodes))+1))
-        self.nnodes = len(self.mesh.nodes)
-        print('File: {}'.format(fileName))
-        print('Named regions')
-        print('{0:<15} {1:<10} {2:<10}'.format('Name','Beams','Membranes'))
-        for n in self.mesh.names:
-            nedges = len(self.mesh.edges[np.where(self.mesh.edgeNames == n[1])])
-            nmembranes = len(self.mesh.membranes[np.where(self.mesh.membraneNames == n[1])])
-            print('{:<15} {:<10} {:<10}'.format(n[2],nedges,nmembranes))
-        print('{:-^36}'.format(''))
-        print('{:<15} {:<10} {:<10}'.format('Sum',len(self.mesh.edges),len(self.mesh.membranes)))
-        self.materialDict = {'C':0, 'E':0, 'nu':0, 't':0, 'rho:':0}
-        self.initialized = False
-        self.preStress = []
+    #TODO: Testing, bug: forces are saved as stresses
+    def write_output_vtk(self, extension=False):
+        num_nodes = self.mesh.number_of_nodes()
+        num_shells = self.mesh.number_of_shells()
 
-    def getAreas(self, projection = False):
+        nodes_str = '\n'.join(
+            ['{} {} {}'.format(*n) for n in self.get_nodes()])
+        shells_str = '\n'.join(
+            ['4 {} {} {} {}'.format(*m) for m in self.mesh.shells])
+        type_str = '\n'.join(
+            np.array(9*np.ones(len(self.mesh.shells), dtype=int), dtype=str))
+        displacements_str = '\n'.join(
+            ['{} {} {}'.format(*d) for d in self.get_absolute_displacement()])
+        stresses_str = ''
+
+        if os.path.isfile('{}.pla'.format(
+                os.path.splitext(self.mesh.name)[0])):
+            shell_stresses = []
+            with open('{}.pla'.format(
+                    os.path.splitext(self.mesh.name)[0])) as fin:
+                lines = fin.readlines()
+                for line in lines[:-len(self.mesh.shells) - 1:-1]:
+                    shell_stresses.append(line.split()[1:])
+                shell_stresses = np.reshape(
+                    np.array(shell_stresses[::-1], dtype=float), (-1, 4, 3))
+                stresses = np.zeros(self.mesh.nodes.shape)
+                for i, nodes in enumerate(self.mesh.shells):
+                    stresses[nodes] += shell_stresses[i]
+            stresses_str = '\n'.join(
+                ['{} {} {}'.format(*s) for s in stresses])
+
+        if self.node_forces.all() != None:
+            node_forces_str = '\n'.join(
+                ['{} {} {}'.format(*f) for f in self.node_forces])
+            # cell_forces_str = '\n'.join(
+            #    ['{} {} {}'.format(*f) for f in self.cell_forces])
+
+        if extension:
+            if 'init' in str(extension):
+                file_name = '{}_{}.vtk'.format(
+                    os.path.splitext(self.mesh.name)[0], extension)
+            else:
+                file_name = '{}_{:0>5}.vtk'.format(
+                    os.path.splitext(self.mesh.name)[0], extension)
+        else:
+            file_name = '{}.vtk'.format(os.path.splitext(self.mesh.name)[0])
+
+        print("Writing output: {}".format(file_name))
+
+        def vtk_header(title, num_points, points,
+                       num_cells, cells, cell_types):
+            header = '# vtk DataFile Version 2.0\n{name}\nASCII\n'.format(
+                name=title)
+
+            geometry = 'DATASET UNSTRUCTURED_GRID\n'
+            key_points = 'POINTS {npts} float\n{pts}\n'.format(
+                npts=num_points, pts=points)
+            key_cells = 'CELLS {ncll} {size}\n{cll}\n'.format(
+                ncll=num_cells, size=5*num_cells, cll=cells)
+            key_cell_types = 'CELL_TYPES {ncll}\n{ctype}\n'.format(
+                ncll=num_cells, ctype=cell_types)
+
+            geometry += key_points + key_cells + key_cell_types
+
+            return header + geometry
+
+        def vtk_vector(data_name, data_str, data_type='float'):
+            out_str = '''VECTORS {dname} {dtype}\n{dstr}'''
+            return out_str.format(
+                dname=data_name, dtype=data_type, dstr=data_str)
+
+        with open(file_name, 'w') as output_file:
+            output_file.write(
+                vtk_header(self.mesh.name, num_nodes, nodes_str,
+                           num_shells, shells_str, type_str))
+            output_file.write('POINT_DATA {}\n'.format(num_nodes))
+            output_file.write(vtk_vector('displacements',
+                                         displacements_str))
+
+            if stresses_str:
+                output_file.write(vtk_vector('stresses', stresses_str))
+            if self.node_forces.all() != None:
+                output_file.write(vtk_vector('forces', node_forces_str))
+                #output_file.write('CELL_DATA {}\n'.format(num_shells))
+                #output_file.write(vtk_vector('forces', cell_forces_str))
+
+    def get_absolute_displacement(self):
+        return self.get_nodes() - self.mesh.nodes
+
+    def get_nodes(self):
         if self.initialized:
-            n = np.reshape(self.nodal.n_x, (-1,3))
+            return np.reshape(self.nodal.n_x, (-1, 3))
         else:
-            n = self.mesh.nodes
-        tris = np.append(self.mesh.membranes[:,:3], \
-                         self.mesh.membranes[:,[0,2,3]],axis = 0)
-        proj = np.cross((n[tris[:,1]] - n[tris[:,0]]),\
-                        (n[tris[:,2]] - n[tris[:,0]]))
-        areas = 0.5 * np.linalg.norm(proj,axis = 1)
-        if projection:
-            return areas, proj
-        else:
-            return areas
+            return self.mesh.nodes
 
-    def getCellCenters(self):
-        if self.initialized:
-            n = np.reshape(self.nodal.n_x,(-1,3))
-        else:
-            n = self.mesh.nodes
-        tris = np.append(self.mesh.membranes[:,:3], self.mesh.membranes[:,[0,2,3]],axis = 0)
-        cellCenters = np.sum(n[tris], axis=1) / 3.0
-        return cellCenters
+    def get_forces(self):
+        return np.reshape(self.nodal.n_f, (-1, 3))
 
-    def getNodes(self):
-        return self.mesh.nodes
-
-    def getDisplacements(self):
-        return np.reshape(self.nodal.n_x, (-1,3)) - self.mesh.nodes
-
-    def setForces(self, force):
-        self.force = force
-        self.nodal.n_f[:] = np.ravel(force)
-
-    def setDistributedLoads(self, pressure = 0, stresses = 0):
-        self.pressure = pressure
-        self.stresses = stresses
-        self.loadsChanged = True
-
-    def calcLoads(self):
-        pressure = self.pressure
-        stresses = self.stresses
-
-        forces = np.zeros(self.mesh.nodes.shape)
-        areas, proj = self.getAreas(True)
-
-        triforces = proj * pressure / 2.0 + stresses * areas[:,None]
-        memforces = triforces[:len(self.mesh.membranes)] + triforces[len(self.mesh.membranes):]
-
-        # Preferrably no looping
-        for i,m in enumerate(self.mesh.membranes):
-            forces[m] += memforces[i] / 4.0
-
-        self.membraneForces = memforces
-        self.nodalForces = forces
-
-        # Must be the same pointer
+    def set_forces(self, forces):
         self.nodal.n_f[:] = np.ravel(forces)
-        return forces
 
-    def solve(self, converged = True):
-        # self.calcLoads()
-        stop = self.nodal.send(converged)
-        if stop:
-            self.writeVTK('final')
+    #TODO: create option for stresses
+    def set_pressure(self, pressure):
+        self.pressure = float(pressure)
+        self.load_changed = True
+
+    #TODO: something about the greyed out part breaks things
+    def calc_pressure_forces(self, forces=0, relaxation=1, limiting=10):
+
+        module_logger.debug('rotvec from mbdyn: \n %s' % self.nodal.n_theta)
+
+        shell_normals = self.mesh.calc_shell_normals(n_x=self.get_nodes(), invert=-1)
+        node_normals_weighted = np.zeros((self.mesh.number_of_nodes(), 3))
+        for i, nodes in enumerate(self.mesh.shells):
+            node_normals_weighted[nodes] += 0.25 * shell_normals[i]
+
+        pressure_forces = node_normals_weighted * self.pressure
+
+        if not isinstance(limiting, type(None)):
+            max_value_pressure = np.max(np.linalg.norm(pressure_forces, axis=1))
+            if max_value_pressure > limiting:
+                pressure_forces = self.node_forces
+            if not isinstance(self.node_forces, (int, float)):
+                max_value_fluid = np.max(np.linalg.norm(forces, axis=1))
+                if max_value_fluid > limiting:
+                    forces = forces / max_value_fluid * 0.3
+
+
+        if relaxation != 1:
+            self.node_forces = self.node_forces + \
+                (pressure_forces - self.node_forces) * relaxation
+        else:
+            self.node_forces = pressure_forces
+
+        # normals = self.get_node_normals()
+        # areas = self.get_cell_areas()
+
+        # partial_areas = np.zeros(self.mesh.number_of_nodes())
+        # for i, nodes in enumerate(self.mesh.shells):
+        #     partial_areas[nodes] += areas[i] / 4.0
+
+        # print('normal', normals)
+        # print('areas', areas)
+        # print('partial', partial_areas)
+
+        # self.node_forces = np.multiply(
+        #     normals.transpose(),partial_areas).transpose() * self.pressure
+
+        # fix_force = np.zeros((self.mesh.number_of_nodes(), 3))
+        # fix_force[:,1] = partial_areas * self.pressure
+
+        self.node_forces += forces
+
+        # self.node_forces = np.multiply(fix_force, self.pressure)
+        forces_norm = np.linalg.norm(self.node_forces, axis=1)
+        module_logger.debug(
+            'min, max, sum forces after pressure applied:\n{}, {}, {}'.format(
+                np.min(forces_norm), np.max(forces_norm),
+                np.sum(forces_norm)))
+        module_logger.debug(
+            'forces after pressure applied sample:\n{}'.format(
+                self.node_forces[self._debug_samples,:]))
+
+        self.set_forces(self.node_forces)
+
+
+    def solve(self, converged=False):
+        if self.nodal.send(converged):
+            self.write_output_vtk('final')
+            module_logger.debug('on send')
             return True
-        stop = self.nodal.recv()
-        if stop:
-            self.writeVTK('final')
+        if self.nodal.recv():
+            module_logger.debug('on recv')
+            self.write_output_vtk('final')
             return True
         return False
 
-    def solveStatic(self, tolerance = 1e-6, maxIterations = 10000, write=True):
-        previousX = 0
-        for i in range(maxIterations):
-            self.calcLoads()
+    #TODO
+    def solve_static(self, tolerance=1e-6, max_iterations=10000,
+                     write=True):
+        previous_position = 0
+        for i in range(max_iterations):
+            self.calc_pressure_forces(relaxation=0.3, limiting=20000)
             if self.solve(True):
-                return
-            currentX = self.getDisplacements()
-            twoNormX = np.linalg.norm(currentX - previousX)
-            previousX = currentX
-            print('Finished iteration: {}/{}, displacement two-norm diff: {}/{}'.format(i,maxIterations, twoNormX, tolerance))
-            if twoNormX < tolerance:
-                print('Converged in {}/{} iterations'.format(i, maxIterations))
+                return True
+            current_position = self.get_absolute_displacement()
+            two_norm_diff = np.linalg.norm(
+                current_position - previous_position)
+            previous_position = current_position
+            module_logger.debug('Finished iteration: {}/{}, displacement two-norm diff: {}/{}'.format(
+                i, max_iterations, two_norm_diff, tolerance))
+            if write:
+                    self.write_output_vtk(str(i))
+            if two_norm_diff < tolerance and i > 500:
+                print('Converged in {}/{} iterations'.format(
+                    i, max_iterations))
                 if write:
-                    self.writeVTK('final')
-                return
-        print('No convergence in {} iterations'.format(maxIterations))
-        return True
+                    self.write_output_vtk('static-final')
+                return True
+        print('No convergence in {} iterations'.format(max_iterations))
+        return False
 
-    def finalize(self):
-        self.nodal.destroy()
+    def solve_initial(self, tolerance=5e-6, max_iterations=10000,
+                     write=True):
 
-    def writeVTK(self, extension=False):
-        nnodes = len(self.mesh.nodes)
-        nmembranes = len(self.mesh.membranes)
-        nodesstr = '\n'.join(['{} {} {}'.format(*n) for n in self.mesh.nodes])
-        membranesstr = '\n'.join(['4 {} {} {} {}'.format(*m) for m in self.mesh.membranes])
-        typestr = '\n'.join(np.array(9*np.ones(len(self.mesh.membranes),dtype=int),dtype=str))
-        displacements = self.getDisplacements()
-        displacementsstr = '\n'.join(['{} {} {}'.format(*d) for d in (displacements)])
-        stressesstr = ''
-        if os.path.isfile('{}.pla'.format(self.caseName)):
-            memStresses = []
-            with open('{}.pla'.format(self.caseName)) as fin:
-                lines = fin.readlines()
-                for l in lines[:-len(self.mesh.membranes) - 1:-1]:
-                    memStresses.append(l.split()[1:])
-                memStresses = np.reshape(np.array(memStresses[::-1],dtype=float),(-1,4,3))
-                stresses = np.zeros(self.mesh.nodes.shape)
-                for i,m in enumerate(self.mesh.membranes):
-                    stresses[m] += memStresses[i]
-            stressesstr = '\n'.join(['{} {} {}'.format(*s) for s in (stresses)])
-        if len(self.nodalForces):
-            nodalForcesstr = '\n'.join(['{} {} {}'.format(*f) for f in (self.nodalForces)])
-            forcesstr = '\n'.join(['{} {} {}'.format(*f) for f in (self.membraneForces)])
-        if extension:
-            fileName = '{}_{:0>5}.vtk'.format(self.caseName,extension)
+        previous_position = 0
+
+        # calculate static force magnitude on each node
+        self.calc_pressure_forces()
+        node_forces_mag = np.linalg.norm(self.node_forces, axis=1)[:, np.newaxis]
+
+        # calculate node normals
+        def node_normals(xyz=self.get_nodes()):
+            shell_normals = self.mesh.calc_shell_normals(n_x=xyz, normalize=True)
+            normals = np.zeros((self.mesh.number_of_nodes(), 3))
+            for i, nodes in enumerate(self.mesh.shells):
+                normals[nodes] += shell_normals[i]
+            return normalize_vectors(normals)
+
+        # calculate static force in new direction
+        def new_force():
+            return node_normals() * node_forces_mag
+
+        for i in range(max_iterations):
+            if self.solve(True):
+                return True
+
+            current_position = self.get_absolute_displacement()
+
+            two_norm_diff = np.linalg.norm(
+                current_position - previous_position)
+
+            previous_position = current_position
+
+            module_logger.debug('Finished iteration: {}/{}, displacement two-norm diff: {}/{}'.format(
+                i, max_iterations, two_norm_diff, tolerance))
+
+            update = new_force()
+            update *= ((i+1)/200) if i < 200 else 1
+            self.node_forces = update
+            self.set_forces(update)
+
+            forces_norm = np.linalg.norm(update, axis=1)
+            module_logger.debug(
+                'min, max, sum forces after pressure applied:\n{}, {}, {}'.format(
+                    np.min(forces_norm), np.max(forces_norm),
+                    np.sum(forces_norm)))
+            module_logger.debug(
+                'forces after pressure applied sample:\n{}'.format(
+                    update[self._debug_samples,:]))
+
+            if write and i % 50 == 0:
+                    self.write_output_vtk('init_{:0>5}'.format(i))
+
+            if two_norm_diff < tolerance and i > 500:
+                module_logger.debug('Converged in {}/{} iterations'.format(
+                    i, max_iterations))
+                if write:
+                    self.write_output_vtk('init_final')
+                return True
+
+        module_logger.debugd('No convergence in {} iterations'.format(max_iterations))
+
+        return False
+
+    #TODO
+    def get_cell_areas(self):
+        if self.initialized:
+            areas = self.mesh.calc_shell_areas(
+                vertices=np.reshape(self.nodal.n_x, (-1, 3)))
         else:
-            fileName = '{}.vtk'.format(self.caseName)
-        print("Writing output: {}".format(fileName))
-        with open(fileName,'w') as fout:
-            fout.write('''# vtk DataFile Version 2.0
-{}
-ASCII
-DATASET UNSTRUCTURED_GRID
-POINTS {nnodes} float
-{nodesstr}
-CELLS {nmembranes} {}
-{membranesstr}
-CELL_TYPES {nmembranes}
-{typestr}
+            areas = self.mesh.calc_shell_areas()
+        return areas
 
-POINT_DATA {nnodes}
-VECTORS displacements float
-{displacementsstr}
-'''.format(self.caseName, 5*nmembranes, **locals()))
-            if stressesstr:
-                fout.write('''
-VECTORS stresses float
-{stressesstr}
-'''.format(**locals()))
-            if len(self.nodalForces):
-                fout.write('''
-VECTORS forces float
-{nodalForcesstr}
-
-CELL_DATA {nmembranes}
-VECTORS forces float
-{forcesstr}
-'''.format(**locals()))
-
-
-    def writeMBDynScript(self, fileName = ''):
-        if not fileName:
-            self.mbdscript = self.caseName + '.mbd'
+    #TODO
+    def get_cell_centers(self):
+        if self.initialized:
+            cell_centers = self.mesh.calc_shell_centers(
+                n_x=np.reshape(self.nodal.n_x, (-1, 3)))
         else:
-            self.mbdscript = filename
-        nnodes = self.nnodes
-        nmembranes = len(self.mesh.membranes)
-        njoints = nnodes
-        materialDict = {'C':0, 'E':0, 'nu':0, 't':0, 'rho':0}
-        materialDict.update(self.materialDict)
-        if 'rho' in self.materialDict and self.materialDict['rho']:
-            nmasses = len(self.mesh.nodes)
-            mass = self.MBMass()
+            cell_centers = self.mesh.calc_shell_centers()
+        return cell_centers
+
+    # TODO
+    def get_node_normals(self):
+        if self.initialized:
+            cell_normals = self.mesh.calc_shell_normals(
+                n_x=self.get_nodes(),normalize=True)
         else:
-            nmasses = 0
-            mass = '' 
-        if 'C' in self.materialDict and self.materialDict['C']:
-            damping = self.MBDamping()
-            nnodes += 1
-            njoints += (nnodes + 1)
+            cell_normals = self.mesh.calc_shell_normals(normalize=True)
+
+        normals = np.zeros((self.mesh.number_of_nodes(),3))
+        for i, nodes in enumerate(self.mesh.shells):
+            normals[nodes] += cell_normals[i]
+        normals = normalize_vectors(normals)
+
+        return normals
+
+
+class PreciceHelper:
+    def __init__(self, path):
+        self.interface = None
+        self.config_path = path
+        self.dimensions = 0
+        self.num_vertices = 0
+        self.vertex_ids = 0
+        self.quad_ids = 0
+        self.displacement_id = 0
+        self.displacement = None
+        self.force_id = 0
+        self.force = None
+        self.time_step = 0
+
+    def setup_interface(self, solver_name='Structure_Solver'):
+        print(solver_name, self.config_path)
+        self.interface = precice.Interface(
+            solver_name, str(self.config_path), 0, 1)
+
+    def configure_interface(self, nodes, grid_name='Structure_Nodes',
+                            quads=None):
+        self.num_vertices = len(nodes)
+        self.dimensions = self.interface.get_dimensions()
+
+        mesh_id = self.interface.get_mesh_id(grid_name)
+        vertices = nodes
+
+        self.displacement = np.zeros((self.num_vertices, self.dimensions))
+        self.force = np.zeros((self.num_vertices, self.dimensions))
+
+        self.vertex_ids = self.interface.set_mesh_vertices(
+            mesh_id, vertices)
+
+        module_logger.debug('precice vertex ids:\n %s' % str(self.vertex_ids))
+
+        if not isinstance(quads, type(None)):
+            for ids in quads:
+                self.quad_ids = self.interface.set_mesh_quad_with_edges(
+                    mesh_id, ids[0], ids[1], ids[2], ids[3])
+
+        self.displacement_id = self.interface.get_data_id(
+            'DisplacementDelta', mesh_id)
+        self.force_id = self.interface.get_data_id(
+            'Force', mesh_id)
+
+        self.time_step = self.interface.initialize()
+
+        if self.interface.is_read_data_available():
+            self.interface.read_block_vector_data(self.force_id,
+                                                  self.vertex_ids)
+
+    def initialize_data(self):
+        if self.interface.is_action_required(
+                precice.action_write_initial_data()):
+            self.interface.write_block_vector_data(self.displacement_id,
+                                                   self.vertex_ids,
+                                                   self.displacement)
+            self.interface.mark_action_fulfilled(
+                precice.action_write_initial_data())
+
+        self.interface.initialize_data()
+
+    def get_participant_name_from_xml(self):
+        with open(self.config_path, 'r', encoding='utf8') as file:
+            content = file.read()
+            soup = BeautifulSoup(content, 'xml')
+            participants = soup.find_all("participant")
+            for solver in participants:
+                if 'Force' in solver.find('read-data').attrs['name']:
+                    name = solver.attrs['name']
+        return name
+
+    def get_mesh_name_from_xml(self):
+        with open(self.config_path, 'r', encoding='utf8') as file:
+            content = file.read()
+            soup = BeautifulSoup(content, 'xml')
+            participants = soup.find_all("participant")
+            for solver in participants:
+                if 'Force' in solver.find('read-data').attrs['name']:
+                    mesh_names = solver.find_all('use-mesh')
+                    for mesh in mesh_names:
+                        if 'provide' in mesh.attrs:
+                            name = mesh.attrs['name']
+        return name
+
+    def advance_time(self):
+        print("MBDyn Adapter: Advancing in time")
+        self.time_step = self.interface.advance(self.time_step)
+
+    def read_data(self):
+        if self.interface.is_read_data_available():
+            self.force = self.interface.read_block_vector_data(
+                self.force_id, self.vertex_ids)
+
+    def write_data(self, write_data):
+        if self.interface.is_write_data_required(self.time_step):
+            self.interface.write_block_vector_data(
+                self.displacement_id, self.vertex_ids, write_data)
+
+
+class Mesh:
+    def __init__(self):
+        self.name = ''
+        self.nodes = np.array(None)
+        self.node_constraints = np.array(None)
+        self.node_orientations = np.array(None)
+        self.edges = np.array(None)
+        self.edge_names = np.array(None)
+        self.shells = np.array(None)
+        self.shell_names = np.array(None)
+
+
+    def constraints_from_edge_names(self):
+        self.node_constraints = np.full((len(self.nodes), 6), False,
+                                        dtype='?')
+        for idx in range(len(self.edges)):
+            cur_constraints = np.full(6, False, dtype='?')
+            cur_name = self.edge_names[idx].casefold()
+            if 'fix' in cur_name:
+                cur_name = cur_name.replace('fix', '')
+                if cur_name == 'all':
+                    cur_constraints[:] = True
+                else:
+                    if 'x' in cur_name:
+                        cur_constraints[0] = True
+                    if 'y' in cur_name:
+                        cur_constraints[1] = True
+                    if 'z' in cur_name:
+                        cur_constraints[2] = True
+                    if 'a' in cur_name:
+                        cur_constraints[3] = True
+                    if 'b' in cur_name:
+                        cur_constraints[4] = True
+                    if 'c' in cur_name:
+                        cur_constraints[5] = True
+            for node in self.edges[idx]:
+                self.node_constraints[node, :] += cur_constraints
+
+    def number_of_nodes(self):
+        return len(self.nodes)
+
+    def number_of_shells(self):
+        return len(self.shells)
+
+    def calc_shell_normals(self, n_x=None, normalize=False, invert=1):
+        if isinstance(n_x, type(None)):
+            n_x = self.nodes
+
+        triangles = np.append(self.shells[:, :3],
+                              self.shells[:, [0, 2, 3]], axis=0)
+        triangle_proj = 0.5 * np.cross(
+            (n_x[triangles[:, 1]] - n_x[triangles[:, 0]]),
+            (n_x[triangles[:, 2]] - n_x[triangles[:, 0]]))
+
+        num_triangles = self.number_of_shells()
+        proj = triangle_proj[:num_triangles] + triangle_proj[num_triangles:]
+        proj = proj * invert
+
+        if normalize:
+            proj = normalize_vectors(proj)
+
+        return proj
+
+    def calc_shell_areas(self, vertices=None):
+        if vertices is None:
+            normals = self.calc_shell_normals()
         else:
-            damping = ''
-        
-        with open(self.mbdscript, 'w') as fout:
-            fout.write('''
-begin: data;
-    problem: initial value;
-end: data;
+            normals = self.calc_shell_normals(n_x=vertices)
 
-begin: initial value;
-    initial time: {initialTime};
-    final time: {finalTime};
-    time step: {timeStep};
-    method: ms, 0.6;
-    tolerance: 1e-6;
-    max iterations: 300;
-    linear solver: umfpack;
-    output: iterations; 
-    threads: disable;
-    modify residual test;
-end: initial value;
+        return np.linalg.norm(normals, axis=1)
 
-begin: control data;
-    structural nodes: {nnodes};
-    beams: 0;
-    plates: {nmembranes};
-    joints: {njoints};
-    rigid bodies: {nmasses};
-    forces: 1;
-    default output: none, plates;
-    output frequency: {output frequency};
-end: control data;
-'''.format(nnodes = nnodes, njoints = njoints, nmembranes = nmembranes, nmasses=nmasses, **self.controlDict))
+    def calc_shell_centers(self, n_x=None, shape='quadrilaterals'):
+        if n_x is None:
+            n_x = self.nodes
 
-            fout.write('''
-set: real C   = {C};
-set: real Et  = {E};
-set: real nut = {nu};
-set: real t   = {t};
-set: real rho = {rho};
-'''.format(**materialDict))
+        if shape == 'triangels':
+            triangles_from_shells = np.append(
+                self.shells[:, :3], self.shells[:, [0, 2, 3]], axis=0)
+            cell_centers = np.sum(n_x[triangles_from_shells], axis=1) / 3.0
 
-            fout.write('''
-begin: nodes;
-{}
-end: nodes;
+        if shape == 'quadrilaterals':
+            cell_centers = np.sum(n_x[self.shells], axis=1) / 4.0
 
-begin: elements;
-{}
-{}
-{}
-{}
-{}
-end: elements;
-'''.format(self.MBNodes(), self.MBJoints(), damping, mass, self.MBMembranes(), self.MBForces()))
+        return cell_centers
 
-    def setPreStress(self, preStress):
-        self.preStress = preStress
-        
+    def calc_node_orientation(self, unchanged='z', clean_unchanged=True,
+                              return_normal=False, flip_normal=1):
+        valid_unchanged = ['x', 'y', 'z']
+        if unchanged not in valid_unchanged:
+            raise ValueError('unchanged must be one of {}.'.format(
+                unchanged))
 
+        cell_normals = self.calc_shell_normals() * flip_normal
 
-    def MBNodes(self):
-        nodesstr = "structural: {}, dynamic, {}, {}, {}, eye, null, null;"
-        string = '\n'.join([nodesstr.format(i,n[0],n[1],n[2]) for i, n in enumerate(self.mesh.nodes)])
-        if 'C' in self.materialDict and self.materialDict['C']:
-            string += '\nstructural: {}, static, 0.0, 0.0, -1.0, eye, null, null, output, no;'.format(len(self.mesh.nodes))
+        if clean_unchanged:
+            cell_normals[:, valid_unchanged.index(unchanged)] = 0
 
-        return string
+        cell_normals = normalize_vectors(cell_normals)
 
-    def MBDamping(self):
-        index = 2 * self.indexing 
-        clampnode = len(self.mesh.nodes)
-        string = 'joint: {}, clamp, {}, node, node;\n'.format(index, clampnode)
-        index += 1
-        # string += '\n'.join(['joint: {}, deformable displacement joint, {}, null, {}, null, linear viscoelastic isotropic, K, C;'.format(index+i, clampnode, i) for i in range(len(self.nodes))])
-        string += '\n'.join(['joint: {}, deformable displacement joint, {}, null, {}, null, linear viscous, C;'.format(index+i, clampnode, i) for i in range(len(self.mesh.nodes))])
-        string += '\n\n'
-        return string
+        node_normals = np.zeros((self.number_of_nodes(), 3))
 
-    def MBJoints(self):
-        index = 3 * self.indexing
-        jointsstr = "joint: {}, total pin joint, {}, position, null, position orientation, eye, rotation orientation, eye,\nposition, {}, {}, {}, position orientation, eye, rotation orientation, eye,\nposition constraint, {}, {}, {}, null, orientation constraint, active, active, active, null;\n"
+        for i, vertices in enumerate(self.shells):
+            node_normals[vertices, :] += cell_normals[i, :]
 
-        mbjoints = []
+        node_normals = normalize_vectors(node_normals)
 
-        dofs = np.zeros(self.mesh.nodes.shape, dtype=bool)
+        # TODO: which coordinate points outwards
+        global_frame = np.zeros((2, 3))
+        global_frame[0, 1] = 1
+        global_frame[1, 2] = 1
 
-        for name in self.mesh.names:
-            if 'fix' in name[2]:
-                iedges = self.mesh.edges[np.where(self.mesh.edgeNames == name[1])]
-                imembranes = self.mesh.membranes[np.where(self.mesh.membraneNames == name[1])]
-                idofs = np.unique(np.append(np.ravel(iedges),np.ravel(imembranes)))
-                if 'All' in name[2]:
-                    dofs[idofs] = True
-                if 'X' in name[2]:
-                    dofs[idofs, 0] = True
-                if 'Y' in name[2]:
-                    dofs[idofs, 1] = True
-                if 'Z' in name[2]:
-                    dofs[idofs, 2] = True
-                if 'XY' in name[2]:
-                    dofs[idofs, 0] = True
-                    dofs[idofs, 1] = True
-                if 'XZ' in name[2]:
-                    dofs[idofs, 0] = True
-                    dofs[idofs, 2] = True
-                if 'YZ' in name[2]:
-                    dofs[idofs, 1] = True
-                    dofs[idofs, 2] = True
-        for i,d in enumerate(dofs):
-            dof = ['inactive','inactive','inactive']
-            n = self.mesh.nodes[i]
-            if d[0]:
-                dof[0] = 'active'
-            if d[1]:
-                dof[1] = 'active'
-            if d[2]:
-                dof[2] = 'active'
-            mbjoints.append(jointsstr.format(index + i, i, n[0],n[1],n[2], *dof))
-        string = '\n'.join(mbjoints)
-        return string
+        local_frame = global_frame.copy()
 
-    def MBMass(self):
-        index  = 6 * self.indexing
-        massstr = "body: {}, {}, {}*rho*t, null, diag, 0.0, 0.0, 0.0;"
+        orientation = np.zeros((self.number_of_nodes(), 3))
 
-        masses = np.zeros(len(self.mesh.nodes))
+        for i, normal in enumerate(node_normals):
+            local_frame[0, :] = normal
+            rotation = R.align_vectors(global_frame, local_frame)
+            orientation[i, :] = rotation[0].as_euler('xyz')
 
-        areas = self.getAreas()
+        self.node_orientations = orientation
 
-        areas = areas[:len(self.mesh.membranes)] + areas[len(self.mesh.membranes):]
+        if return_normal:
+            return orientation, node_normals
+        return orientation
 
-        # Preferrably no looping
-        for i,m in enumerate(self.mesh.membranes):
-            masses[m] += areas[i] / 4.0
+    def match_names(self, names, edgenumbers, shellnumbers):
+        self.edge_names = np.empty(len(edgenumbers), dtype='U')
+        self.shell_names = np.empty(len(shellnumbers), dtype='U')
 
-        string = '\n'.join([massstr.format(index + i, i, m) for i, m in enumerate(masses)])
-        return string
+        print('Named regions found:')
+        print('{0:<15} {1:<10} {2:<10}'.format('Name', 'Edges', 'Shells'))
 
-        
-    def MBMembranes(self):
-        index = 4 * self.indexing
-        if len(self.preStress):
-            membranesstr = "membrane4eas: {}, {}, {}, {}, {}, isotropic, E, Et, nu, nut, thickness, t, prestress, {}, {}, {};"
-            string = '\n'.join([membranesstr.format(index + i, m[0], m[1], m[2], m[3], *ps) for i, (m, ps) in enumerate(zip(self.mesh.membranes, self.preStress))])
-        else:
-            membranesstr = "membrane4eas: {}, {}, {}, {}, {}, isotropic, E, Et, nu, nut, thickness, t;"
-            string = '\n'.join([membranesstr.format(index + i, m[0], m[1], m[2], m[3]) for i, m in enumerate(self.mesh.membranes)])
-        return string 
+        for name in names:
+            self.edge_names = np.where(edgenumbers == name[1],
+                                       name[2], self.edge_names)
+            self.shell_names = np.where(shellnumbers == name[1],
+                                        name[2], self.shell_names)
+            n_edgetype = np.count_nonzero(edgenumbers == name[1])
+            n_shelltype = np.count_nonzero(shellnumbers == name[1])
+            print('{:<15} {:<10} {:<10}'.format(name[2], n_edgetype,
+                                                n_shelltype))
 
-    def MBForces(self):
-        index = 5 * self.indexing
-        nodesstr = ','.join(map(str,range(len(self.mesh.nodes))))
-        string = '''
-force: {}, external structural, socket, create, yes, path, "{}.sock", coupling, tight, orientation, none, accelerations, no, {}, {};'''.format(index, self.caseName, len(self.mesh.nodes), nodesstr)
-        return string
+        print('{:-^36}'.format(''))
+        print('{:<15} {:<10} {:<10}'.format('Sum', len(edgenumbers),
+                                            len(shellnumbers)))
+
+    #TODO: fix if, test it
+    def set_clamp_constraint(self, fixed_nodes, dead_z=False):
+        assert(isinstance(fixed_nodes, (slice, list)))
+        if not self.node_constraints.any():
+            self.node_constraints = np.full(
+                (self.number_of_nodes(), 6),  False, dtype='?')
+        self.node_constraints[fixed_nodes, :3] = True
+        if dead_z:
+            self.node_constraints[:, 2] = True
+
+        # temporary
+        # for index, pos in enumerate(self.nodes):
+        #     if pos[2] == -0.6:
+        #         self.node_constraints[index, :] = False
+
+        self.node_constraints[:, 2] = True
+        self.node_constraints[:, 3:] = True
+
+def normalize_vectors(vectors):
+    length = np.linalg.norm(vectors, axis=1)
+    return np.divide(vectors.transpose(), length).transpose()
+
 
 if __name__ == "__main__":
     pass
