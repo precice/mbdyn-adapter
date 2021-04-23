@@ -104,7 +104,7 @@ class MBDynHelper:
             stresses_str = '\n'.join(
                 ['{} {} {}'.format(*s) for s in stresses])
 
-        if self.node_forces.all() != None:
+        if isinstance(self.node_forces, np.ndarray):
             node_forces_str = '\n'.join(
                 ['{} {} {}'.format(*f) for f in self.node_forces])
             # cell_forces_str = '\n'.join(
@@ -154,7 +154,7 @@ class MBDynHelper:
 
             if stresses_str:
                 output_file.write(vtk_vector('stresses', stresses_str))
-            if self.node_forces.all() != None:
+            if isinstance(self.node_forces, np.ndarray):
                 output_file.write(vtk_vector('forces', node_forces_str))
                 #output_file.write('CELL_DATA {}\n'.format(num_shells))
                 #output_file.write(vtk_vector('forces', cell_forces_str))
@@ -184,7 +184,7 @@ class MBDynHelper:
 
         module_logger.debug('rotvec from mbdyn: \n %s' % self.nodal.n_theta)
 
-        shell_normals = self.mesh.calc_shell_normals(n_x=self.get_nodes(), invert=-1)
+        shell_normals = self.mesh.calc_shell_normals(n_x=self.get_nodes(), invert=1)
         node_normals_weighted = np.zeros((self.mesh.number_of_nodes(), 3))
         for i, nodes in enumerate(self.mesh.shells):
             node_normals_weighted[nodes] += 0.25 * shell_normals[i]
@@ -324,7 +324,7 @@ class MBDynHelper:
                 'forces after pressure applied sample:\n{}'.format(
                     update[self._debug_samples,:]))
 
-            if write and i % 50 == 0:
+            if write and i % 5 == 0:
                     self.write_output_vtk('init_{:0>5}'.format(i))
 
             if two_norm_diff < tolerance and i > 500:

@@ -13,7 +13,7 @@ class MBDynPrep:
     ''' A simple preprocessor that provides the data
     for the precice-mbdyn adapter. '''
 
-    def __init__(self, case_name=None):
+    def __init__(self, case_name=None, in_mm=True):
         self.name = ''
         self.mesh = Mesh()
         self.problem_dict = dict()
@@ -30,9 +30,10 @@ class MBDynPrep:
                 config_name = 'mbdyn-config'
             self.read_config(config_name)
             if 'fixed nodes' in self.nodes_dict.keys():
-                self.read_gmsh(case_name, self.nodes_dict['fixed nodes'])
+                self.read_gmsh(case_name, 
+                               self.nodes_dict['fixed nodes'], mm_to_m=in_mm)
             else:
-                self.read_gmsh(case_name)
+                self.read_gmsh(case_name, mm_to_m=in_mm)
 
     def read_config(self, file_name='mbdyn-config'):
         parser = configparser.ConfigParser()
@@ -54,7 +55,7 @@ class MBDynPrep:
                     self.nodes_dict['fixed nodes'].append(int(node) - 1)
 
     # TODO: Test changes
-    def read_gmsh(self, file_name, fixed_nodes=None):
+    def read_gmsh(self, file_name, fixed_nodes=None, mm_to_m=False):
         self.name = os.path.splitext(os.path.basename(file_name))[0]
         mesh_file = open(file_name, 'r')
         if 'MeshFormat' in mesh_file.readline():
@@ -114,6 +115,9 @@ class MBDynPrep:
 
         if fixed_nodes is not None:
             self.mesh.set_clamp_constraint(fixed_nodes, dead_z=True)
+            
+        if mm_to_m:
+            self.mesh.nodes *= 0.001
 
     # TODO
     def read_meshio(self, file_name, fixed_nodes=None):
@@ -141,4 +145,4 @@ class MBDynPrep:
 
 
 if __name__ == '__main__':
-    prep = MBDynPrep('kite-v4-refined.msh')
+    prep = MBDynPrep('kite-v5-1500cells.msh')

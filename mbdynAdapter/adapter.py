@@ -84,10 +84,7 @@ class MBDynAdapter:
 
     def run_simulation(self):
         iteration = 0
-        previous_displacement = 0  # self.mbdyn.get_absolute_displacement()
-        if self._inter_mesh:
-            previous_displacement = np.concatenate(
-                (previous_displacement, previous_displacement), axis=0)
+        previous_displacement =  0
 
         while self.precice.interface.is_coupling_ongoing():
             if self.precice.interface.is_action_required(
@@ -104,7 +101,12 @@ class MBDynAdapter:
                     self.precice.force, (-1, self.precice.dimensions))
             else:
                 force_tensor = np.reshape(self.precice.force, (-1, 3))
-
+                
+            max_value_fluid = np.max(np.linalg.norm(force_tensor, axis=1))
+            if max_value_fluid > 10:
+                force_tensor = force_tensor / max_value_fluid * 0.3
+            
+            
             if self._inter_mesh:
                 split = np.split(force_tensor, 2, axis=0)
                 force_tensor = split[0] + split[1]
