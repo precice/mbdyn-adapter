@@ -172,6 +172,7 @@ class MBDynHelper:
         return np.reshape(self.nodal.n_f, (-1, 3))
 
     def set_forces(self, forces):
+        self.node_forces = forces
         self.nodal.n_f[:] = np.ravel(forces)
 
     #TODO: create option for stresses
@@ -200,43 +201,23 @@ class MBDynHelper:
                 if max_value_fluid > limiting:
                     forces = forces / max_value_fluid * 0.3
 
-
         if relaxation != 1:
-            self.node_forces = self.node_forces + \
-                (pressure_forces - self.node_forces) * relaxation
+            new_forces = self.node_forces + \
+                (pressure_forces + forces - self.node_forces) * relaxation
         else:
-            self.node_forces = pressure_forces
-
-        # normals = self.get_node_normals()
-        # areas = self.get_cell_areas()
-
-        # partial_areas = np.zeros(self.mesh.number_of_nodes())
-        # for i, nodes in enumerate(self.mesh.shells):
-        #     partial_areas[nodes] += areas[i] / 4.0
-
-        # print('normal', normals)
-        # print('areas', areas)
-        # print('partial', partial_areas)
-
-        # self.node_forces = np.multiply(
-        #     normals.transpose(),partial_areas).transpose() * self.pressure
-
-        # fix_force = np.zeros((self.mesh.number_of_nodes(), 3))
-        # fix_force[:,1] = partial_areas * self.pressure
-
-        self.node_forces += forces
+            new_forces = pressure_forces + forces
 
         # self.node_forces = np.multiply(fix_force, self.pressure)
-        forces_norm = np.linalg.norm(self.node_forces, axis=1)
+        forces_norm = np.linalg.norm(new_forces, axis=1)
         module_logger.debug(
             'min, max, sum forces after pressure applied:\n{}, {}, {}'.format(
                 np.min(forces_norm), np.max(forces_norm),
                 np.sum(forces_norm)))
         module_logger.debug(
             'forces after pressure applied sample:\n{}'.format(
-                self.node_forces[self._debug_samples,:]))
+                new_forces[self._debug_samples,:]))
 
-        self.set_forces(self.node_forces)
+        self.set_forces(new_forces)
 
 
     def solve(self, converged=False):
@@ -334,7 +315,7 @@ class MBDynHelper:
                     self.write_output_vtk('init_final')
                 return True
 
-        module_logger.debugd('No convergence in {} iterations'.format(max_iterations))
+        module_logger.debug('No convergence in {} iterations'.format(max_iterations))
 
         return False
 
@@ -621,21 +602,13 @@ class Mesh:
 
     #TODO: fix if, test it
     def set_clamp_constraint(self, fixed_nodes, dead_z=False):
-        assert(isinstance(fixed_nodes, (slice, list)))
+        assert(isinstance(fixed_nodes, (slice, list, int)))
         if not self.node_constraints.any():
             self.node_constraints = np.full(
                 (self.number_of_nodes(), 6),  False, dtype='?')
         self.node_constraints[fixed_nodes, :3] = True
         if dead_z:
             self.node_constraints[:, 2] = True
-
-        # temporary
-        # for index, pos in enumerate(self.nodes):
-        #     if pos[2] == -0.6:
-        #         self.node_constraints[index, :] = False
-
-        self.node_constraints[:, 2] = True
-        self.node_constraints[:, 3:] = True
 
 def normalize_vectors(vectors):
     length = np.linalg.norm(vectors, axis=1)

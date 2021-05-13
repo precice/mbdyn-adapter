@@ -1,6 +1,9 @@
 # Ignore example folder
 **/test-files/
 
+# Forgot to add legacy to git ignore
+**/legacy/
+
 # Sublime project
 *.sublime*
 

@@ -53,6 +53,8 @@ class MBDynPrep:
                 self.nodes_dict['fixed nodes'] = list()
                 for node in splitter:
                     self.nodes_dict['fixed nodes'].append(int(node) - 1)
+            else:
+                self.nodes_dict['fixed nodes'] = int(self.nodes_dict['fixed nodes'])
 
     # TODO: Test changes
     def read_gmsh(self, file_name, fixed_nodes=None, mm_to_m=False):
@@ -114,7 +116,7 @@ class MBDynPrep:
             self.mesh.constraints_from_edge_names()
 
         if fixed_nodes is not None:
-            self.mesh.set_clamp_constraint(fixed_nodes, dead_z=True)
+            self.mesh.set_clamp_constraint(fixed_nodes, dead_z=False)
             
         if mm_to_m:
             self.mesh.nodes *= 0.001
@@ -145,4 +147,4 @@ class MBDynPrep:
 
 
 if __name__ == '__main__':
-    prep = MBDynPrep('kite-v5-1500cells.msh')
+    prep = MBDynPrep('test-files/kite-v5-1500cells.msh')

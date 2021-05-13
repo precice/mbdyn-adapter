@@ -156,3 +156,277 @@ def extract_nodes_and_normals(file_name):
                               num_time_steps, num_nodes)
 
     return nodes_normals, tmp_rotation.as_matrix()
+
+# %%
+
+
+def n_triangles(points):
+    v1, v2, v3 = points[1:, :] - points[0, :]
+    normal = 0.5 * (np.cross(v1, v2) + np.cross(v2, v3))
+
+    area = np.linalg.norm(normal)
+
+    return normal / area
+
+
+def n_lsquare_height(points):
+    # Note: only for 3D planes
+    average = np.average(points, axis=0)
+    reduced = points-average
+
+    matrix_a = reduced[:, :2]
+    vector_b = reduced[:, 2]
+
+    inverse = np.linalg.inv(np.dot(matrix_a.T, matrix_a))
+    a_tilde, b_tilde = inverse.dot(np.dot(matrix_a.T, vector_b))
+
+    normal = np.array([-a_tilde, -b_tilde, 1])
+
+    return normal / np.linalg.norm(normal)
+
+
+def n_lsquare_orthogonal(points):
+    # Note: points.shape = (m_samples, n_coordinates)
+    m, n = points.shape
+
+    average = np.average(points, axis=0)
+    reduced = np.asmatrix(points-average)
+
+    c_matrix = np.zeros((n, n))
+    for i in range(m):
+        c_matrix += np.matmul(reduced[i, :].T, reduced[i, :])
+    
+    test = np.cov(reduced.T)
+
+    eigen_val, eigen_vec = np.linalg.eig(c_matrix)
+    smallest = np.argmin(eigen_val)
+
+    normal = eigen_vec[:, smallest]
+
+    return normal / np.linalg.norm(normal)
+
+# %%
+
+
+def plane_with_noise_data(n, delta_x=0.25, delta_y=0.5, offset=5, length=5):
+    noise = 0.5
+
+    data = np.zeros((n, 3))
+    data[:, 0] = [np.random.uniform(2*length)-length for i in range(n)]
+    data[:, 1] = [np.random.uniform(2*length)-length for i in range(n)]
+    for i in range(n):
+        data[i, 2] = data[i, 0] * delta_x + data[i, 1] * delta_y \
+            + offset + np.random.normal(scale=noise)
+    return data
+
+import meshio
+from functools import lru_cache
+from timeit import default_timer
+
+def fsi_data(f_path):
+    mesh = meshio.read(f_path)
+    if 'quad' in mesh.cells_dict:
+        for quad in mesh.cells_dict['quad']:
+            yield mesh.points[quad]
+
+def normal_algorithms(org_vtk, def_vtk):
+    vtk_locs = [org_vtk, def_vtk]
+    func = {'triangles':    n_triangles,
+            'height':       n_lsquare_height,
+            'orthogonal':   n_lsquare_orthogonal}
+    normal = {'triangles':  np.empty((0,3)),
+              'height':     np.empty((0,3)),
+              'orthogonal': np.empty((0,3))}
+    for method in func:
+        print("Using method {}!".format(method))
+        for vtk in vtk_locs:
+            quads = fsi_data(vtk)
+            start = default_timer()
+            for quad in quads:
+                try:
+                    n = func[method](quad)
+                except:
+                    print('prop singulary')
+                    n = np.array([0, 0, 0])
+                normal[method] = np.append(
+                    normal[method], n.reshape((1,-1)), axis=0)
+            end = default_timer()
+            print("Elapsed time: {:.3f}".format((end-start)*1000))
+    return normal
+
+def compare_algorithms():
+    vtk_0 = 'test-files/kite-v5-1500cells_00001.vtk'
+    vtk_1 = 'test-files/kite-v5-1500cells_01209.vtk'
+    
+    normals = normal_algorithms(vtk_0, vtk_1)
+    alphas = np.empty((0))
+    
+    tri, zdir, ortho = normals.keys()
+    for ls in [zdir, ortho]:
+        for i, normal in enumerate(normals[ls]):
+            scalar = np.dot(normals[tri][i,:], normal)
+            if abs(scalar) > 1:
+                scalar /= abs(scalar)
+            angle = np.arccos(scalar) * 180 / np.pi
+            alphas = np.append(alphas, angle)
+    
+    indices = alphas > 90
+    alphas -= 180 * indices
+    alphas = np.absolute(alphas)
+    alphas = np.split(alphas, 4)
+    indices = np.split(indices, 4)
+    for a, i in zip(alphas, indices):
+        print("average change: {:.3f}".format(np.average(a)))
+        print("max change: {:.3f}".format(np.max(a)))
+        print("wrong orientation: {}".format(np.sum(i)))
+        
+    # fig, ax = plt.subplots()
+    # for a in alphas:
+    #     ax.plot(a)
+    # plt.show()
+    
+    return alphas
+    
+erg = compare_algorithms()
+
+#%%
+def test_orthogonal_regression(data=None):
+
+    if isinstance(data, type(None)):
+        data = plane_with_noise_data(100)
+
+    # data = np.array([[1.12000000e+00, 3.76613819e-03, 1.45161682e-09],
+    #     [1.08130613e+00, 9.10306656e-03, 1.31469972e-09],
+    #     [1.08130613e+00, 9.10306656e-03, 5.00000013e-02],
+    #     [1.12000000e+00, 3.76613819e-03, 5.00000013e-02]])
+
+    # data[2:,1] += 0.2
+
+    # data = np.array([[ 5.2765869e-02,  1.0268845e-01, -4.9462944e-02],
+    #     [ 7.1312808e-02,  6.3278370e-02, -4.7897752e-02],
+    #     [ 8.3707243e-02,  7.2916396e-02, -2.6163558e-05],
+    #     [ 5.2508812e-02,  1.0379118e-01, -4.4938151e-05]])
+
+    data = np.array([[4.3525200e-02,  5.8813106e-02, -5.0000295e-02],
+                     [1.1218552e-02,  3.0126929e-02, -4.9997341e-02],
+                     [1.1219671e-02,  3.0127788e-02,  2.2274909e-09],
+                     [4.3526553e-02,  5.8813721e-02,  2.8943647e-09]])
+
+    # data = np.array([[ 1,  0, 0.2],
+    #     [ 0.5,  0, 1.5],
+    #     [-0.5,  0, -0.1],
+    #     [0.1,  0,  -1]])
+
+    ave = np.average(data, axis=0)
+
+    data_dash = np.asmatrix(data - ave)
+
+    cov_data = np.zeros((3, 3))
+    for sample in range(data.shape[0]):
+        cov_data += np.matmul(data_dash[sample, :].T,  data_dash[sample, :])
+
+    eigen_val, eigen_vec = np.linalg.eig(cov_data)
+    # print(eigen_val, eigen_vec)
+
+    normal_index = np.argmin(eigen_val)
+    # normal_index = 1
+
+    normal = eigen_vec[:, normal_index]
+    # print(normal)
+
+    import timeit
+
+    t = timeit.Timer(lambda: n_triangles(data))
+    print(t.timeit(10000))
+    t = timeit.Timer(lambda: n_lsquare_height(data))
+    print(t.timeit(10000))
+    t = timeit.Timer(lambda: n_lsquare_orthogonal(data))
+    print(t.timeit(10000))
+
+    normal_tri = n_triangles(data)
+    normal_hei = n_lsquare_height(data)
+    normal_or = n_lsquare_orthogonal(data)
+
+    print(normal_tri)
+    print(normal_hei, np.arccos(np.dot(normal_tri, normal_hei))*180/np.pi)
+    print(normal_or, np.arccos(np.dot(normal_tri, normal_or))*180/np.pi)
+
+    normal = normal_or
+
+    # normal = eigen_vec[:3, normal_index] / np.linalg.norm(eigen_vec[:3, normal_index])
+
+    # normal_tmp = normal
+    # normal_tmp[0] = normal[1]
+    # normal_tmp[1] = -normal[0]
+
+    # normal = normal_tmp
+    # d = -ave.dot(normal)
+
+    # # create x,y
+    # xx, yy = np.meshgrid(np.arange(0, 1, 0.1), np.arange(0, 1, 0.1))
+
+    # # calculate corresponding z
+    # z = -(-normal[0] * xx - normal[1] * yy - d) * 1. /normal[2]
+
+    # plt3d.plot_surface(xx, yy, z)
+
+    # plt3d.quiver(ave[0], ave[1], ave[2],
+    #              normal[0], normal[1], normal[2])
+
+    # fig, ax = plt.subplots()
+
+    # ax.quiver(ave[0], ave[1], normal[0]  , normal[1], units='xy')
+    # ax.plot(ave[0], ave[1], 'o')
+    # ax.plot(ave[0] + normal[0], ave[1] + normal[1], 'o')
+    # ax.plot(data[:,0], data[:,1], 'o')
+    # ax.set_xlabel('x')
+    # ax.set_ylabel('y')
+    # ax.set_aspect('equal')
+
+    fig = plt.figure()
+    ax2 = plt.subplot(111, projection='3d')
+
+    # print(np.dot(eigen_vec.T[0], eigen_vec.T[1]))
+    # print(np.dot(eigen_vec.T[1], eigen_vec.T[2]))
+    # print(np.dot(eigen_vec.T[2], eigen_vec.T[0]))
+
+    for vec in eigen_vec.T:
+        ax2.quiver(ave[0], ave[1], ave[2],
+                   vec[0]*10, vec[1]*10, vec[2]*10)
+
+    x_min = np.min(data[:, 0])
+    x_max = np.max(data[:, 0])
+
+    y_min = np.min(data[:, 1])
+    y_max = np.max(data[:, 1])
+
+    z_min = np.min(data[:, 2])
+    z_max = np.max(data[:, 2])
+
+    center = [x_min+0.5*(x_max-x_min), y_min+0.5 *
+              (y_max-y_min), z_min+0.5*(z_max-z_min)]
+
+    length = 1.2 * np.max([x_max-x_min, y_max-y_min, z_max-z_min])
+
+    ax2.set_xlim(center[0]-length/2, center[0]+length/2)
+    ax2.set_ylim(center[1]-length/2, center[1]+length/2)
+    ax2.set_zlim(center[2]-length/2, center[2]+length/2)
+
+    # ax2.quiver(ave[0], ave[1], ave[2],
+    #            normal[0]*10, normal[1]*10, normal[2]*10)
+
+    ax2.scatter(ave[0], ave[1], ave[2], color='red')
+    ax2.scatter(data[:, 0], data[:, 1], data[:, 2], color='blue')
+
+    d = -ave.dot(normal)
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, length/10),
+                         np.arange(y_min, y_max, length/10))
+    # calculate corresponding z
+    zz = (-normal[0] * xx - normal[1] * yy - d) * 1. / normal[2]
+
+    ax2.plot_surface(xx, yy, zz)
+
+    # plt.show()
+
+
+test_orthogonal_regression()

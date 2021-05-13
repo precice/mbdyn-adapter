@@ -102,10 +102,6 @@ class MBDynAdapter:
             else:
                 force_tensor = np.reshape(self.precice.force, (-1, 3))
                 
-            max_value_fluid = np.max(np.linalg.norm(force_tensor, axis=1))
-            if max_value_fluid > 10:
-                force_tensor = force_tensor / max_value_fluid * 0.3
-            
             
             if self._inter_mesh:
                 split = np.split(force_tensor, 2, axis=0)
@@ -121,6 +117,10 @@ class MBDynAdapter:
             module_logger.debug(
                 'forces from precice sample:\n{}'.format(
                     force_tensor[self.mbdyn._debug_samples, :]))
+            
+            max_value_fluid = np.max(np.linalg.norm(force_tensor, axis=1))
+            if max_value_fluid > 10:
+                force_tensor = force_tensor / max_value_fluid * 0.3
 
             if self.mbdyn.load_changed:
                 self.mbdyn.calc_pressure_forces(force_tensor)

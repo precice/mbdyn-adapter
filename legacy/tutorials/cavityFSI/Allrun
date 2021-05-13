@@ -1,5 +1,0 @@
-cd fluid
-blockMesh  &> log.blockMesh
-pimpleFoam &> log.pimpleFoam & 
-cd ../structure
-python cavityFSI.py &> log.structure &

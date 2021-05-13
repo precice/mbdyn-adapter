@@ -1,0 +1,77 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v1912                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application         pimpleFoam;
+
+startFrom           latestTime;
+
+startTime           0;
+
+stopAt              endTime;
+
+endTime             100;
+
+deltaT              0.05;
+
+writeControl        runTime;
+
+writeInterval       0.10;
+
+purgeWrite          0;
+
+writeFormat         binary;
+
+writePrecision      14;
+
+writeCompression    off;
+
+timeFormat          general;
+
+timePrecision       9;
+
+runTimeModifiable   no;
+
+adjustTimeStep      no;
+
+maxCo               0.2;
+
+functions
+{
+    preCICE_Adapter
+    {
+        type preciceAdapterFunctionObject;
+        libs ("libpreciceAdapterFunctionObject.so");
+    }
+
+    forces_structure
+    {
+        type            forces;
+        libs            ("libforces.so");
+        patches         (bottomWall);
+        p               p;
+        U               U;
+        rho             rhoInf;
+        rhoInf          1.0;
+        pRef            0;
+        porosity        no;
+        writeFields     no;
+        CofR            (0 0 0);
+        log             true;
+    }
+}
+
+// ************************************************************************* //
