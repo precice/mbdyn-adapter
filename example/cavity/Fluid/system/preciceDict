@@ -45,6 +45,7 @@ interfaces
     {
 
         mesh              Fluid_CellCenters;
+
         patches           (bottomWall);
         locations         faceCenters;
 

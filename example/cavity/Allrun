@@ -29,8 +29,6 @@ Participant1="Fluid"
     echo "  Restoring 0/ from 0.orig/..."
         rm -rfv 0
         cp -r initBCs 0
-        rm -rfv dynamicCode
-        cp -r initCode dynamicCode
     cd ..
 
     echo "  Preparing the mesh..."
