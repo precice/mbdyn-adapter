@@ -30,7 +30,7 @@ class MBDynPrep:
                 config_name = 'mbdyn-config'
             self.read_config(config_name)
             if 'fixed nodes' in self.nodes_dict.keys():
-                self.read_gmsh(case_name, 
+                self.read_gmsh(case_name,
                                self.nodes_dict['fixed nodes'], mm_to_m=in_mm)
             else:
                 self.read_gmsh(case_name, mm_to_m=in_mm)
@@ -54,7 +54,8 @@ class MBDynPrep:
                 for node in splitter:
                     self.nodes_dict['fixed nodes'].append(int(node) - 1)
             else:
-                self.nodes_dict['fixed nodes'] = int(self.nodes_dict['fixed nodes'])
+                self.nodes_dict['fixed nodes'] = int(
+                    self.nodes_dict['fixed nodes'])
 
     # TODO: Test changes
     def read_gmsh(self, file_name, fixed_nodes=None, mm_to_m=False):
@@ -117,11 +118,11 @@ class MBDynPrep:
 
         if fixed_nodes is not None:
             self.mesh.set_clamp_constraint(fixed_nodes, dead_z=False)
-            
+
         if mm_to_m:
             self.mesh.nodes *= 0.001
 
-    # TODO
+    # TODO: switch to meshio
     def read_meshio(self, file_name, fixed_nodes=None):
         meshio_mesh = meshio.read(file_name)
 

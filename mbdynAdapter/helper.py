@@ -3,15 +3,16 @@
 
 from subprocess import Popen
 import os
+import logging
 from mbc_py_interface import mbcNodal
 from bs4 import BeautifulSoup
 import precice
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-import logging
 
 # create logger
 module_logger = logging.getLogger('adapter.helper')
+
 
 class MBDynHelper:
     def __init__(self, mesh):
@@ -36,9 +37,7 @@ class MBDynHelper:
         for i in range(1, num_samples):
             self._debug_samples.append(int(interval*i)-1)
 
-
     def initialize(self, case='shell'):
-
 
         self.input_file_name = case + '.mbd'
         self.log_file = open(self.log_file_path, 'w')
@@ -56,8 +55,8 @@ class MBDynHelper:
         data_and_next = 1
         refnode = 0
         nodes = self.mesh.number_of_nodes()
-        labels = 0 # 16
-        rot = 0 # for rotvec 256, rotmat 512, euler 1024; see mbc.h enum MBCType
+        labels = 0  # 16
+        rot = 0  # for rotvec 256, rotmat 512, euler 1024; see mbc.h enum MBCType
         accels = 0
         self.nodal = mbcNodal(path, host, port, timeout, verbose,
                               data_and_next, refnode, nodes, labels,
@@ -73,7 +72,6 @@ class MBDynHelper:
         except AttributeError:
             print('Warning: Could not close log file or destroy mbc.')
 
-    #TODO: Testing, bug: forces are saved as stresses
     def write_output_vtk(self, extension=False):
         num_nodes = self.mesh.number_of_nodes()
         num_shells = self.mesh.number_of_shells()
@@ -165,8 +163,7 @@ class MBDynHelper:
     def get_nodes(self):
         if self.initialized:
             return np.reshape(self.nodal.n_x, (-1, 3))
-        else:
-            return self.mesh.nodes
+        return self.mesh.nodes
 
     def get_forces(self):
         return np.reshape(self.nodal.n_f, (-1, 3))
@@ -175,17 +172,18 @@ class MBDynHelper:
         self.node_forces = forces
         self.nodal.n_f[:] = np.ravel(forces)
 
-    #TODO: create option for stresses
+    # TODO: create option for stresses
     def set_pressure(self, pressure):
         self.pressure = float(pressure)
         self.load_changed = True
 
-    #TODO: something about the greyed out part breaks things
+    # TODO: something about the greyed out part breaks things
     def calc_pressure_forces(self, forces=0, relaxation=1, limiting=10):
 
         module_logger.debug('rotvec from mbdyn: \n %s' % self.nodal.n_theta)
 
-        shell_normals = self.mesh.calc_shell_normals(n_x=self.get_nodes(), invert=1)
+        shell_normals = self.mesh.calc_shell_normals(
+            n_x=self.get_nodes(), invert=1)
         node_normals_weighted = np.zeros((self.mesh.number_of_nodes(), 3))
         for i, nodes in enumerate(self.mesh.shells):
             node_normals_weighted[nodes] += 0.25 * shell_normals[i]
@@ -193,7 +191,8 @@ class MBDynHelper:
         pressure_forces = node_normals_weighted * self.pressure
 
         if not isinstance(limiting, type(None)):
-            max_value_pressure = np.max(np.linalg.norm(pressure_forces, axis=1))
+            max_value_pressure = np.max(
+                np.linalg.norm(pressure_forces, axis=1))
             if max_value_pressure > limiting:
                 pressure_forces = self.node_forces
             if not isinstance(self.node_forces, (int, float)):
@@ -215,10 +214,9 @@ class MBDynHelper:
                 np.sum(forces_norm)))
         module_logger.debug(
             'forces after pressure applied sample:\n{}'.format(
-                new_forces[self._debug_samples,:]))
+                new_forces[self._debug_samples, :]))
 
         self.set_forces(new_forces)
-
 
     def solve(self, converged=False):
         if self.nodal.send(converged):
@@ -231,7 +229,7 @@ class MBDynHelper:
             return True
         return False
 
-    #TODO
+    # TODO
     def solve_static(self, tolerance=1e-6, max_iterations=10000,
                      write=True):
         previous_position = 0
@@ -246,7 +244,7 @@ class MBDynHelper:
             module_logger.debug('Finished iteration: {}/{}, displacement two-norm diff: {}/{}'.format(
                 i, max_iterations, two_norm_diff, tolerance))
             if write:
-                    self.write_output_vtk(str(i))
+                self.write_output_vtk(str(i))
             if two_norm_diff < tolerance and i > 500:
                 print('Converged in {}/{} iterations'.format(
                     i, max_iterations))
@@ -257,17 +255,19 @@ class MBDynHelper:
         return False
 
     def solve_initial(self, tolerance=5e-6, max_iterations=10000,
-                     write=True):
+                      write=True):
 
         previous_position = 0
 
         # calculate static force magnitude on each node
         self.calc_pressure_forces()
-        node_forces_mag = np.linalg.norm(self.node_forces, axis=1)[:, np.newaxis]
+        node_forces_mag = np.linalg.norm(
+            self.node_forces, axis=1)[:, np.newaxis]
 
         # calculate node normals
         def node_normals(xyz=self.get_nodes()):
-            shell_normals = self.mesh.calc_shell_normals(n_x=xyz, normalize=True)
+            shell_normals = self.mesh.calc_shell_normals(
+                n_x=xyz, normalize=True)
             normals = np.zeros((self.mesh.number_of_nodes(), 3))
             for i, nodes in enumerate(self.mesh.shells):
                 normals[nodes] += shell_normals[i]
@@ -303,10 +303,10 @@ class MBDynHelper:
                     np.sum(forces_norm)))
             module_logger.debug(
                 'forces after pressure applied sample:\n{}'.format(
-                    update[self._debug_samples,:]))
+                    update[self._debug_samples, :]))
 
             if write and i % 5 == 0:
-                    self.write_output_vtk('init_{:0>5}'.format(i))
+                self.write_output_vtk('init_{:0>5}'.format(i))
 
             if two_norm_diff < tolerance and i > 500:
                 module_logger.debug('Converged in {}/{} iterations'.format(
@@ -315,11 +315,11 @@ class MBDynHelper:
                     self.write_output_vtk('init_final')
                 return True
 
-        module_logger.debug('No convergence in {} iterations'.format(max_iterations))
+        module_logger.debug(
+            'No convergence in {} iterations'.format(max_iterations))
 
         return False
 
-    #TODO
     def get_cell_areas(self):
         if self.initialized:
             areas = self.mesh.calc_shell_areas(
@@ -328,7 +328,6 @@ class MBDynHelper:
             areas = self.mesh.calc_shell_areas()
         return areas
 
-    #TODO
     def get_cell_centers(self):
         if self.initialized:
             cell_centers = self.mesh.calc_shell_centers(
@@ -337,15 +336,14 @@ class MBDynHelper:
             cell_centers = self.mesh.calc_shell_centers()
         return cell_centers
 
-    # TODO
     def get_node_normals(self):
         if self.initialized:
             cell_normals = self.mesh.calc_shell_normals(
-                n_x=self.get_nodes(),normalize=True)
+                n_x=self.get_nodes(), normalize=True)
         else:
             cell_normals = self.mesh.calc_shell_normals(normalize=True)
 
-        normals = np.zeros((self.mesh.number_of_nodes(),3))
+        normals = np.zeros((self.mesh.number_of_nodes(), 3))
         for i, nodes in enumerate(self.mesh.shells):
             normals[nodes] += cell_normals[i]
         normals = normalize_vectors(normals)
@@ -463,7 +461,6 @@ class Mesh:
         self.edge_names = np.array(None)
         self.shells = np.array(None)
         self.shell_names = np.array(None)
-
 
     def constraints_from_edge_names(self):
         self.node_constraints = np.full((len(self.nodes), 6), False,
@@ -600,15 +597,15 @@ class Mesh:
         print('{:<15} {:<10} {:<10}'.format('Sum', len(edgenumbers),
                                             len(shellnumbers)))
 
-    #TODO: fix if, test it
+    # TODO: fix if, test it
     def set_clamp_constraint(self, fixed_nodes, dead_z=False):
-        assert(isinstance(fixed_nodes, (slice, list, int)))
+        assert isinstance(fixed_nodes, (slice, list, int))
         if not self.node_constraints.any():
             self.node_constraints = np.full(
                 (self.number_of_nodes(), 6),  False, dtype='?')
-        self.node_constraints[fixed_nodes, :3] = True
         if dead_z:
             self.node_constraints[:, 2] = True
+
 
 def normalize_vectors(vectors):
     length = np.linalg.norm(vectors, axis=1)

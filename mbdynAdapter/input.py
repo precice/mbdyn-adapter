@@ -5,7 +5,6 @@ import numpy as np
 
 
 class MBDynInput:
-    '''This is a quick summary line used as a description of the object.'''
 
     def __init__(self):
         self._indexing = 0
@@ -373,10 +372,10 @@ class ElementsBlock(Block):
     # TODO: constraints for dynamic displacement nodes if possible
     def constraints_from_mesh(self, input_mesh, indexing):
         index_offset = 3 * indexing
-        
+
         if 'membrane' in [plate.casefold() for plate in input_mesh.shell_names]:
-            input_mesh.node_constraints[:,3:] = True
-        
+            input_mesh.node_constraints[:, 3:] = True
+
         constraint_str = input_mesh.node_constraints.astype(np.str_)
         constraint_str = np.char.replace(constraint_str, 'True', 'active')
         constraint_str = np.char.replace(constraint_str, 'False', 'inactive')
