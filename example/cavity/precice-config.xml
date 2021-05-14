@@ -59,7 +59,7 @@
     </participant>
 
     <m2n:sockets
-        exchange-directory="/home/hagen/kitefsi-cases/lid-driven-cavity/3D-case"
+        exchange-directory="../"
         from="Fluid_Solver"
         to="Structure_Solver"
         enforce-gather-scatter="1"/>
