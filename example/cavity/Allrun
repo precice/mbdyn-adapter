@@ -67,7 +67,7 @@ Solver2="predyn.py"
   echo "  Starting the ${Participant2} participant..."
   cd ${Participant2}
 
-  python3 ${Solver2} > ../${Participant2}.log  2>&1 &
+  python3 ${Solver2} > ../log.${Participant2}  2>&1 &
   PIDParticipant2=$!
   echo "  ${Participant2} PID: ${PIDParticipant2}"
 

@@ -20,7 +20,7 @@ class MBDynHelper:
         self.process = None
         self.nodal = None
         self.log_file = None
-        self.log_file_path = '../mbdyn.log'
+        self.log_file_path = '../log.mbdyn'
         self.input_file_name = 'shell.mbd'
         self.mesh = mesh
         self.load_changed = False

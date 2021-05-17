@@ -20,7 +20,7 @@ class MBDynAdapter:
 
         if debugging:
             module_logger.setLevel(logging.DEBUG)
-            log_file_handler = logging.FileHandler('adapter.log')
+            log_file_handler = logging.FileHandler('log.adapter')
             log_file_handler.setLevel(logging.DEBUG)
             module_logger.addHandler(log_file_handler)
             print('Debugging enabled!')
