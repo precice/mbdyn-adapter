@@ -22,50 +22,56 @@ fi
 # =============== Participant 1: Fluid ===========================
 Participant1="Fluid"
 
-    # Prepare
-    echo "Preparing the ${Participant1} participant..."
+  # Prepare
+  echo "Preparing the ${Participant1} participant..."
 
-    cd $Participant1
-    echo "  Restoring 0/ from 0.orig/..."
-        rm -rfv 0
-        cp -r initBCs 0
-    cd ..
+  cd ${Participant1}
 
-    echo "  Preparing the mesh..."
-    blockMesh -case ${Participant1} > ${Participant1}_blockMesh.log 2>&1
-    checkMesh -case ${Participant1} > ${Participant1}_checkMesh.log 2>&1
+  echo "  Restoring 0/ from initBCs/..."
+  rm -rfv 0
+  cp -r initBCs 0
 
-    # get application information
-    cd ${Participant1}
-        Solver1=$(getApplication)    # solver
-        echo "  ${Participant1} Solver: ${Solver1}."
-    cd ..
+  echo "  Preparing the mesh..."
+  blockMesh > ../log.${Participant1}.blockMesh 2>&1
+  checkMesh > ../log.${Participant1}.checkMeshg 2>&1
 
-    # Run and get the process id
-    if [ $parallel -eq 1 ]; then
-        echo "  Decomposing the case..."
-        decomposePar -force -case ${Participant1} > ${Participant1}_decomposePar.log 2>&1
-        cd ${Participant1}
-            nproc=$(getNumberOfProcessors)
-        cd ..
-        echo "  Starting the ${Participant1} participant in parallel..."
-        mpirun --use-hwthread-cpus -np ${nproc} ${Solver1} -parallel -case ${Participant1} > ${Participant1}.log 2>&1 &
-    else
-        echo "  Starting the ${Participant1} participant in serial..."
-        ${Solver1} -case ${Participant1} > ${Participant1}.log 2>&1 &
-    fi
-    PIDParticipant1=$!
+  # get application information
+  Solver1=$(getApplication)    # solver
+  echo "  ${Participant1} Solver: ${Solver1}."
+
+  # Run and get the process id
+  if [ $parallel -eq 1 ]; then
+
+    echo "  Decomposing the case..."
+    decomposePar -force > ../log.${Participant1}.decomposePar 2>&1
+    nproc=$(getNumberOfProcessors)
+
+    echo "  Starting the ${Participant1} participant in parallel..."
+    mpirun --use-hwthread-cpus -np ${nproc} ${Solver1} -parallel > ../log.${Participant1} 2>&1 &
+
+  else
+    echo "  Starting the ${Participant1} participant in serial..."
+    ${Solver1} > ../log.${Participant1} 2>&1 &
+  fi
+
+  PIDParticipant1=$!
+  echo "  ${Participant1} PID: ${PIDParticipant1}"
+
+  cd ..
 
 # =============== Participant 2: Solid ===========================
 Participant2="Solid"
 Solver2="predyn.py"
 
-    # Run
-    echo "  Starting the ${Participant2} participant..."
-    cd Solid
-    python3 ${Solver2} > ../${Participant2}.log  2>&1 &
-    PIDParticipant2=$!
-    cd ..
+  # Run
+  echo "  Starting the ${Participant2} participant..."
+  cd ${Participant2}
+
+  python3 ${Solver2} > ../${Participant2}.log  2>&1 &
+  PIDParticipant2=$!
+  echo "  ${Participant2} PID: ${PIDParticipant2}"
+
+  cd ..
 
 
 # =============== Wait for all the participants to finish =======
@@ -73,33 +79,28 @@ echo "Waiting for the participants to exit..., PIDs: ${PIDParticipant1}, ${PIDPa
 echo "(you may run 'tail -f ${Participant1}.log' in another terminal to check the progress)"
 
 echo "To interrupt the simulation, press 'c'. Ctrl+C will only send the processes to the background."
-while [ -e /proc/${PIDParticipant1} ]; do
-    read -r -t1 -n1 input
-    if [ "$input" = "c" ]; then
-        kill ${PIDParticipant1}
-        kill ${PIDParticipant2}
-        false
-    fi
-done
-
-if [ $? -ne 0 ] || [ "$(grep -c -E "error:" ${Participant1}.log)" -ne 0 ] || [ "$(grep -c -E "error:" ${Participant2}.log)" -ne 0 ]; then
-    echo ""
-    echo "Something went wrong... See the log files for more."
-    # Precaution
+while [[ -e /proc/${PIDParticipant1} || -e /proc/${PIDParticipant2} ]]; do
+  read -r -t1 -n1 input
+  if [ "$input" = "c" ]; then
     kill ${PIDParticipant1}
     kill ${PIDParticipant2}
+    false
+  fi
+done
+
+if [ $? -ne 0 ] || [ "$(grep -c -E "error:" log.${Participant1})" -ne 0 ] || [ "$(grep -c -E "error:" log.${Participant2})" -ne 0 ]; then
+  echo ""
+  echo "Something went wrong... See the log files for more."
+  # Precaution
+  kill ${PIDParticipant1}
+  kill ${PIDParticipant2}
 else
-    echo ""
-    echo "The simulation completed! (check for any errors)"
-    if [ $parallel -eq 1 ]; then
-        echo "Reconstructing fields..."
-        reconstructPar -case ${Participant1} > ${Participant1}_reconstructPar.log 2>&1 &
-    fi
+  echo ""
+  echo "The simulation completed! (check for any errors)"
+  if [ $parallel -eq 1 ]; then
+    echo "Reconstructing fields..."
+    reconstructPar -case ${Participant1} > log.${Participant1}.reconstructPar 2>&1 &
+  fi
 
-    echo "You may now open '${Participant1}/${Participant1}.foam' in ParaView."
-    # Note: ".foam" triggers the native OpenFOAM reader of ParaView.
-    # Change to ".OpenFOAM" to use the OpenFOAM reader provided with OpenFOAM.
+  echo "You may now open '${Participant1}/${Participant1}.foam' in ParaView."
 fi
-
-echo ""
-echo "### NOTE ### Make sure to use the correct solver for your OpenFOAM version! (pimpleFoam for OpenFOAM v1806, OpenFOAM 6, or newer, vs pimpleDyMFoam for older) You may change this in your Fluid/system/controlDict file, if needed."

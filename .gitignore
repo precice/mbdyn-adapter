@@ -1,3 +1,33 @@
+# Simulation
+
+# OpenFOAM files
+**/Fluid/[0-9]*/
+**/Fluid/[0-9].[0-9]*/
+**/Fluid/processor*/
+**/Fluid/postProcessing/
+**/Fluid/constant/polyMesh/
+**/Fluid/dynamicCode/
+*.foam
+
+# MBDyn files
+*.jnt
+*.mov
+*.ine
+*.out
+*.pla
+*.vtk
+*.frc
+*.abs
+*.gen
+*.mbd
+
+# Log files
+log.*
+*.log
+
+# preCICE files
+**/precice-run/
+
 # Ignore example folder
 **/test-files/
 

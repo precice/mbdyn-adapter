@@ -15,7 +15,7 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-preciceConfig   "precice-config.xml";
+preciceConfig   "../precice-config.xml";
 
 participant     Fluid_Solver;
 
