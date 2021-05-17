@@ -16,6 +16,7 @@ Dependencies:
 git clone https://public.gitlab.polimi.it/DAER/mbdyn.git
 cd mbdyn
 git checkout develop
+./bootstrap.sh
 CPPFLAGS=-I/usr/include/suitesparse PYTHON_VERSION=3 ./configure --enable-python=yes
 make
 sudo make install
