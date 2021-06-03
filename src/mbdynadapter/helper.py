@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 import precice
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-
+import meshio
 # create logger
 module_logger = logging.getLogger('adapter.helper')
 
@@ -73,41 +73,6 @@ class MBDynHelper:
             print('Warning: Could not close log file or destroy mbc.')
 
     def write_output_vtk(self, extension=False):
-        num_nodes = self.mesh.number_of_nodes()
-        num_shells = self.mesh.number_of_shells()
-
-        nodes_str = '\n'.join(
-            ['{} {} {}'.format(*n) for n in self.get_nodes()])
-        shells_str = '\n'.join(
-            ['4 {} {} {} {}'.format(*m) for m in self.mesh.shells])
-        type_str = '\n'.join(
-            np.array(9*np.ones(len(self.mesh.shells), dtype=int), dtype=str))
-        displacements_str = '\n'.join(
-            ['{} {} {}'.format(*d) for d in self.get_absolute_displacement()])
-        stresses_str = ''
-
-        if os.path.isfile('{}.pla'.format(
-                os.path.splitext(self.mesh.name)[0])):
-            shell_stresses = []
-            with open('{}.pla'.format(
-                    os.path.splitext(self.mesh.name)[0])) as fin:
-                lines = fin.readlines()
-                for line in lines[:-len(self.mesh.shells) - 1:-1]:
-                    shell_stresses.append(line.split()[1:])
-                shell_stresses = np.reshape(
-                    np.array(shell_stresses[::-1], dtype=float), (-1, 4, 3))
-                stresses = np.zeros(self.mesh.nodes.shape)
-                for i, nodes in enumerate(self.mesh.shells):
-                    stresses[nodes] += shell_stresses[i]
-            stresses_str = '\n'.join(
-                ['{} {} {}'.format(*s) for s in stresses])
-
-        if isinstance(self.node_forces, np.ndarray):
-            node_forces_str = '\n'.join(
-                ['{} {} {}'.format(*f) for f in self.node_forces])
-            # cell_forces_str = '\n'.join(
-            #    ['{} {} {}'.format(*f) for f in self.cell_forces])
-
         if extension:
             if 'init' in str(extension):
                 file_name = '{}_{}.vtk'.format(
@@ -118,44 +83,30 @@ class MBDynHelper:
         else:
             file_name = '{}.vtk'.format(os.path.splitext(self.mesh.name)[0])
 
-        print("Writing output: {}".format(file_name))
+        points = self.get_nodes()
+        cells = {'quad': self.mesh.shells}
 
-        def vtk_header(title, num_points, points,
-                       num_cells, cells, cell_types):
-            header = '# vtk DataFile Version 2.0\n{name}\nASCII\n'.format(
-                name=title)
+        point_data = {'displacements': self.get_absolute_displacement()}
 
-            geometry = 'DATASET UNSTRUCTURED_GRID\n'
-            key_points = 'POINTS {npts} float\n{pts}\n'.format(
-                npts=num_points, pts=points)
-            key_cells = 'CELLS {ncll} {size}\n{cll}\n'.format(
-                ncll=num_cells, size=5*num_cells, cll=cells)
-            key_cell_types = 'CELL_TYPES {ncll}\n{ctype}\n'.format(
-                ncll=num_cells, ctype=cell_types)
+        if isinstance(self.node_forces, np.ndarray):
+            point_data['forces'] = self.node_forces
 
-            geometry += key_points + key_cells + key_cell_types
+        plate_file = '{}.pla'.format(os.path.splitext(self.mesh.name)[0])
+        if os.path.isfile(plate_file):
+            shell_stresses = []
+            with open(plate_file, 'r') as fin:
+                lines = fin.readlines()
+                for line in lines[:-len(self.mesh.shells) - 1:-1]:
+                    shell_stresses.append(line.split()[1:])
+                shell_stresses = np.reshape(
+                    np.array(shell_stresses[::-1], dtype=float), (-1, 4, 3))
+                stresses = np.zeros(self.mesh.nodes.shape)
+                for i, nodes in enumerate(self.mesh.shells):
+                    stresses[nodes] += shell_stresses[i]
+            point_data['stresses'] = stresses
 
-            return header + geometry
-
-        def vtk_vector(data_name, data_str, data_type='float'):
-            out_str = '''VECTORS {dname} {dtype}\n{dstr}'''
-            return out_str.format(
-                dname=data_name, dtype=data_type, dstr=data_str)
-
-        with open(file_name, 'w') as output_file:
-            output_file.write(
-                vtk_header(self.mesh.name, num_nodes, nodes_str,
-                           num_shells, shells_str, type_str))
-            output_file.write('POINT_DATA {}\n'.format(num_nodes))
-            output_file.write(vtk_vector('displacements',
-                                         displacements_str))
-
-            if stresses_str:
-                output_file.write(vtk_vector('stresses', stresses_str))
-            if isinstance(self.node_forces, np.ndarray):
-                output_file.write(vtk_vector('forces', node_forces_str))
-                #output_file.write('CELL_DATA {}\n'.format(num_shells))
-                #output_file.write(vtk_vector('forces', cell_forces_str))
+        meshio.write_points_cells(file_name, points, cells,
+                                  point_data=point_data)
 
     def get_absolute_displacement(self):
         return self.get_nodes() - self.mesh.nodes
@@ -576,33 +527,13 @@ class Mesh:
             return orientation, node_normals
         return orientation
 
-    def match_names(self, names, edgenumbers, shellnumbers):
-        self.edge_names = np.empty(len(edgenumbers), dtype='U')
-        self.shell_names = np.empty(len(shellnumbers), dtype='U')
-
-        print('Named regions found:')
-        print('{0:<15} {1:<10} {2:<10}'.format('Name', 'Edges', 'Shells'))
-
-        for name in names:
-            self.edge_names = np.where(edgenumbers == name[1],
-                                       name[2], self.edge_names)
-            self.shell_names = np.where(shellnumbers == name[1],
-                                        name[2], self.shell_names)
-            n_edgetype = np.count_nonzero(edgenumbers == name[1])
-            n_shelltype = np.count_nonzero(shellnumbers == name[1])
-            print('{:<15} {:<10} {:<10}'.format(name[2], n_edgetype,
-                                                n_shelltype))
-
-        print('{:-^36}'.format(''))
-        print('{:<15} {:<10} {:<10}'.format('Sum', len(edgenumbers),
-                                            len(shellnumbers)))
-
     # TODO: fix if, test it
     def set_clamp_constraint(self, fixed_nodes, dead_z=False):
         assert isinstance(fixed_nodes, (slice, list, int))
         if not self.node_constraints.any():
             self.node_constraints = np.full(
                 (self.number_of_nodes(), 6),  False, dtype='?')
+        self.node_constraints[fixed_nodes, :] = True
         if dead_z:
             self.node_constraints[:, 2] = True
 

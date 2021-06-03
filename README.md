@@ -1,9 +1,15 @@
-# preCICE adapter for MBDyn #
+preCICE adapter for MBDyn
+----------------------------------------------------
 
 ## Installation ##
-No installation configured, instead include folder in PYTHONPATH
+Installation with pip, after cloning the repository:
 ```
-export PYTHONPATH=$PYTHONPATH:<path-to-adapter>
+cd mbdyn-adapter
+pip3 install .
+```
+Alternativly the package can also be used by including the source code folder in the python path environment:
+```
+export PYTHONPATH=$PYTHONPATH:<path-to-adapter-repository>/src/
 ```
 
 Dependencies:
@@ -14,8 +20,7 @@ Dependencies:
 ## MBDyn installation ##
 ```
 git clone https://public.gitlab.polimi.it/DAER/mbdyn.git
-cd mbdyn
-git checkout develop
+cd mbdyn && git checkout develop
 ./bootstrap.sh
 CPPFLAGS=-I/usr/include/suitesparse PYTHON_VERSION=3 ./configure --enable-python=yes
 make
@@ -35,6 +40,11 @@ export PATH=$PATH:/usr/local/mbdyn/bin
 Add the Python interface path to $PYTHONPATH
 ```
 export PYTHONPATH=$PYTHONPATH:/usr/local/mbdyn/libexec/mbpy
+```
+
+Add adapter to $PYTHONPATH
+```
+export PYTHONPATH=$PYTHONPATH:<path-to-adapter-root>/mbdynAdapter
 ```
 
 Requires, see example folder:

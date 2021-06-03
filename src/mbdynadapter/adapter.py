@@ -6,8 +6,8 @@ import logging
 import numpy as np
 import precice
 
-from helper import MBDynHelper, PreciceHelper
-from input import MBDynInput
+from mbdynadapter.helper import MBDynHelper, PreciceHelper
+from mbdynadapter.input import MBDynInput
 
 # create logger
 module_logger = logging.getLogger('adapter')
