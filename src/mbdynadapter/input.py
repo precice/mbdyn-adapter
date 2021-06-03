@@ -286,7 +286,7 @@ class ElementsBlock(Block):
     __body_str = '{blabel}, {nlabel}, {bmass}, {coffset}, {binertia}'
     __gravity_str = '{vec}, const, {val}'
     # orientation matrix
-    __force_coupling_str = '{flabel}, external structural, socket, create, yes, path, "{sname}.sock", no signal, sleep time, 0.05, coupling, tight, orientation, none, accelerations, no, {num},{nodes}'
+    __force_coupling_str = '{flabel}, external structural, socket, create, yes, path, "{sname}.sock", no signal, sleep time, 0.01, coupling, tight, orientation, none, accelerations, no, {num},{nodes}'
     __plate_str = '{mlabel},{mcorners}, {constlaw}{mstress}'
     __total_pin_joint_str = '''{jlabel}, total pin joint, {jnode}, position, reference, node, null, position orientation, reference, node, eye, rotation orientation, reference, node, eye, position, {jpos}, position orientation, {jorientation}, rotation orientation, {jorientation}, position constraint,{pstraint}, null, orientation constraint,{ostraint}, null'''
     __deformable_displacement_joint_str = '{jlabel}, deformable displacement joint, {node1}, null, {node2}, null, {constlaw}'
