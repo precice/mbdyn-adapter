@@ -5,7 +5,7 @@ import os
 import configparser
 import numpy as np
 import meshio
-from mbdynadpter.helper import Mesh
+from mbdynadapter.helper import Mesh
 
 
 class MBDynPrep:
