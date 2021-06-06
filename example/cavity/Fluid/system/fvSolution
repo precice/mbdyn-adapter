@@ -21,8 +21,8 @@ solvers
     p
     {
         solver          GAMG;
-        tolerance       1e-10;
-        relTol          1e-6;
+        tolerance       1e-8;
+        relTol          1e-2;
         smoother        DICGaussSeidel;
     }
 
@@ -54,7 +54,7 @@ solvers
         solver          smoothSolver;
         smoother        symGaussSeidel;
         tolerance       1e-6;
-        relTol          1e-4;
+        relTol          1e-2;
         minIter         2;
     }
 
