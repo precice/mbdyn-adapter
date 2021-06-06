@@ -20,10 +20,10 @@ solvers
 
     p
     {
-        solver           PCG;
-        preconditioner   DIC;
-        tolerance        1e-8;
-        relTol 	         1.0e-3;
+        solver          GAMG;
+        tolerance       1e-10;
+        relTol          1e-6;
+        smoother        DICGaussSeidel;
     }
 
     pFinal
@@ -35,6 +35,7 @@ solvers
     pcorr
     {
         $p;
+        relTol          0;
     }
 
     pcorrFinal

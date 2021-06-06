@@ -20,7 +20,7 @@ class MBDynHelper:
         self.process = None
         self.nodal = None
         self.log_file = None
-        self.log_file_path = '../log.mbdyn'
+        self.log_file_path = '../log.{}mbdyn'
         self.input_file_name = 'shell.mbd'
         self.mesh = mesh
         self.load_changed = False
@@ -38,8 +38,9 @@ class MBDynHelper:
             self._debug_samples.append(int(interval*i)-1)
 
     def initialize(self, case='shell'):
-
         self.input_file_name = case + '.mbd'
+        self.log_file_path = '../log.{}.mbdyn'.format(
+            os.path.split(os.getcwd())[1])
         self.log_file = open(self.log_file_path, 'w')
         self.process = Popen(['mbdyn', '-f', self.input_file_name],
                              stdout=self.log_file,

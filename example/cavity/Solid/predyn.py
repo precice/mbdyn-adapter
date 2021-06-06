@@ -1,5 +1,5 @@
-from mbdynadapter.adapter import MBDynAdapter
-from mbdynadapter.prep import MBDynPrep
+from mbdynprecice.adapter import MBDynAdapter
+from mbdynprecice.prep import MBDynPrep
 
 mbd = MBDynPrep('membrane.msh', in_mm=False)
 adapter = MBDynAdapter(mbd, debugging=False)
