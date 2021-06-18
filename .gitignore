@@ -3,6 +3,7 @@
 # OpenFOAM files
 **/Fluid/[0-9]*/
 **/Fluid/[0-9].[0-9]*/
+!**/Fluid/0.orig
 **/Fluid/processor*/
 **/Fluid/postProcessing/
 **/Fluid/constant/polyMesh/

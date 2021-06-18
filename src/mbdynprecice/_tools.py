@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+This script contains functions to test and diagnose the cell normal calculations.
+"""
+
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import animation

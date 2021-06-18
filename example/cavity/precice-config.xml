@@ -38,14 +38,12 @@
             direction="write"
             from="Fluid_CellCenters"
             to="Structure_Nodes"
-            constraint="conservative"
-            y-dead="true"/>
+            constraint="conservative"/>
         <mapping:rbf-volume-splines
             direction="read"
             from="Structure_Nodes"
             to="Fluid_Nodes"
-            constraint="consistent"
-            y-dead="true"/>
+            constraint="consistent"/>
     </participant>
 
     <participant name="Structure_Solver">
@@ -93,6 +91,7 @@
             data="Force"
             mesh="Structure_Nodes"/>
 
+        <!-- Accelrates or leads to collapse of fluid mesh, use at own discretion -->
         <!-- <extrapolation-order value="2"/> -->
 
         <acceleration:IQN-ILS>

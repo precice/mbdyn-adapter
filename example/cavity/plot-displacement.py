@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Sun Dec 13 09:09:07 2020
-
-@author: hagen
-"""
 
 import numpy as np
 from matplotlib import pyplot as plot
@@ -38,13 +33,10 @@ plot.ylabel('Y')
 plot.rc('grid', linestyle="dotted", color='grey')
 plot.grid()
 
-displacement = digtizer_data('previous_work')
-plot.plot(displacement[:,0], displacement[:,1], label='previous', linestyle='--')
-
-displacement = digtizer_data('valdez')
+displacement = digtizer_data('midpoint-reference-valdez.dat')
 plot.plot(displacement[:,0], displacement[:,1], label='valdez', linestyle='--')
 
-displacement = watchpoint_data('precice-Structure_Solver-watchpoint-point1.log')
+displacement = watchpoint_data('Solid/precice-Structure_Solver-watchpoint-point1.log')
 plot.plot(displacement[:,0], displacement[:,1], label='current')
 
 # plot.xlim(0, 5)
