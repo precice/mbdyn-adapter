@@ -1,0 +1,30 @@
+#-----------------------------------------------------------------------------#
+# configuration of problem and control block in mbdyn script
+# instead of <card> : <args> ; use <card> = <args>
+
+[problem]
+initial time = 0
+
+[control]
+default output = none, plates, structural nodes
+output frequency = 10
+
+#-----------------------------------------------------------------------------#
+# configuration parameters required by adapter
+
+[nodes]
+# required
+orientation = 0
+# optional
+damping node = 0, -5, 0
+#internal pressure = 10
+#fixed nodes = 0:62
+
+[material]
+# required
+Et = 250.
+nut = 0
+t = 0.002
+rho = 500.
+# optional
+C = 0.000001
