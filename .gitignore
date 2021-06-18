@@ -29,11 +29,10 @@ log.*
 # preCICE files
 **/precice-run/
 
-# Ignore example folder
+# Ignore local dev files
 **/test-files/
-
-# Forgot to add legacy to git ignore
 **/legacy/
+_tools.py
 
 # Sublime project
 *.sublime*
