@@ -7,16 +7,12 @@ class MBDynAdapter:
         self.mbd = mbdHelper
         self.interface = precice.Interface("Structure_Solver", configFileName, 0, 1) # proc no, nprocs
         self.dim = self.interface.get_dimensions()
-        nodes = self.mbd.getNodes()
 
+        nodes = self.mbd.getNodes()
         self.nnodes = len(nodes)
 
         nmeshID = self.interface.get_mesh_id("Structure_Nodes")
-        self.nodeVertexIDs = self.nnodes*[0.0]
-        self.interface.set_mesh_vertices(nmeshID, nodes[:,:self.dim])
-        self.displacements = np.array(self.dim*self.nnodes*[0.0])
-
-        self.force = np.array(self.dim*self.nnodes*[0.0])
+        self.nodeVertexIDs= self.interface.set_mesh_vertices(nmeshID, nodes[:,:self.dim])
 
         self.displacementsID = self.interface.get_data_id("DisplacementDelta", nmeshID)
         self.forceID = self.interface.get_data_id("Force", nmeshID)
@@ -24,7 +20,6 @@ class MBDynAdapter:
         self.dt = self.interface.initialize()
         self.mbd.controlDict["timeStep"] = self.dt
         self.mbd.initializeMBDyn()
-
 
         if (self.interface.is_action_required(precice.action_write_initial_data())):
             self.interface.write_block_vector_data(self.displacementsID, self.nodeVertexIDs, self.displacements)
@@ -34,7 +29,6 @@ class MBDynAdapter:
 
         if (self.interface.is_read_data_available()):
             self.force = self.interface.read_block_vector_data(self.forceID, self.nodeVertexIDs)
-        print (self.force)
 
     def runPreCICE(self):
         iteration = 0
@@ -54,13 +48,10 @@ class MBDynAdapter:
                 break
             displacements = self.mbd.getDisplacements()
             relDisplacements = displacements - previousDisplacements
-            print (displacements)
 
             self.interface.write_block_vector_data(self.displacementsID, self.nodeVertexIDs, relDisplacements)
-            print (relDisplacements);
             self.interface.advance(self.dt)
             self.force = self.interface.read_block_vector_data(self.forceID, self.nodeVertexIDs)
-            print (self.force)
 
             if (self.interface.is_action_required(precice.action_read_iteration_checkpoint())): # i.e. not yet converged
                 self.interface.mark_action_fulfilled(precice.action_read_iteration_checkpoint())
@@ -70,6 +61,6 @@ class MBDynAdapter:
 
                 if self.mbd.solve(True):
                     break
-#                if iteration % self.mbd.controlDict['output frequency']  == 0:
-#                    self.mbd.writeVTK(iteration)
+                if iteration % self.mbd.controlDict['output frequency']  == 0:
+                    self.mbd.writeVTK(iteration)
         self.mbd.finalize()
