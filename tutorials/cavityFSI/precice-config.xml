@@ -43,25 +43,27 @@
             <read-data mesh="Structure_Nodes" name="Force" />
         </participant>
 
-        <m2n:sockets exchange-directory="../" from="Fluid_Solver" to="Structure_Solver" distribution-type="gather-scatter" />
+        <m2n:sockets exchange-directory="../" from="Fluid_Solver" to="Structure_Solver" />
+
 
         <coupling-scheme:serial-implicit>
             <participants first="Fluid_Solver" second="Structure_Solver" />
-            <max-timesteps value="70000" />
-            <timestep-length value="0.01" />
+            <max-time-windows value="70000" />
+            <time-window-size value="0.01" />
             <exchange data="Force" from="Fluid_Solver" mesh="Structure_Nodes" to="Structure_Solver" />
             <exchange data="DisplacementDelta" from="Structure_Solver" mesh="Structure_Nodes" to="Fluid_Solver" />
+            <max-iterations value="30" />
             <relative-convergence-measure limit="1.0e-4" data="DisplacementDelta" mesh="Structure_Nodes" />
             <relative-convergence-measure limit="1.0e-4" data="Force" mesh="Structure_Nodes" />
             <extrapolation-order value="2" />
 
-           <post-processing:IQN-IMVJ>
+           <acceleration:IQN-IMVJ>
                 <data name="DisplacementDelta" mesh="Structure_Nodes"/>
                 <preconditioner type="residual-sum"/>
                 <initial-relaxation value="0.1"/>
                 <max-used-iterations value="10"/>
-                <timesteps-reused value="1"/>
-           </post-processing:IQN-IMVJ>		
+                <time-windows-reused value="1"/>
+           </acceleration:IQN-IMVJ>		
 
         </coupling-scheme:serial-implicit>
     </solver-interface>
