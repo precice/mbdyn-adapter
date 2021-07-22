@@ -69,7 +69,7 @@ class MBDynHelper:
                     nlines = int(line)
                     lines_gen = itertools.islice(fin,0,nlines)
                     for e in lines_gen:
-                        cells = map(int,e.split())
+                        cells = list(map(int,e.split()))
                         if cells[1] == 1:
                             edges.append(cells)
                         elif cells[1] == 3:
