@@ -1,4 +1,8 @@
-# preCICE adapter for MBDyn #
+# MBDyn-preCICE adapter
+
+<a style="text-decoration: none" href="https://github.com/precice/fenics-adapter/blob/master/LICENSE" target="_blank">
+    <img src="https://img.shields.io/github/license/precice/mbdyn-adapter.svg" alt="GNU LGPL license">
+</a>
 
 :heart: **This adapter needs a maintainer. [Read more here](https://github.com/precice/mbdyn-adapter/issues/3).** :heart:
 
